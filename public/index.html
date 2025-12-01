@@ -3,60 +3,422 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SFDX Toolkit</title>
+    <title>SFDX Toolkit Console</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 0; background: #0e1117; color: #f1f5f9; }
-      header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #111827; border-bottom: 1px solid #1f2937; position: sticky; top: 0; }
+      :root {
+        --bg: #0d1117;
+        --panel: #0f172a;
+        --panel-alt: #0b1323;
+        --border: #1f2937;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --success: #22c55e;
+        --warn: #f59e0b;
+        --error: #ef4444;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+      header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #0f172a; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
       .logo { font-weight: 700; letter-spacing: 0.4px; }
       .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
-      .pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid #1f2937; background: #0b1323; color: #cbd5e1; }
-      .pill span { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel-alt); color: var(--muted); }
+      .pill span { font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
       .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-      .green { background: #22c55e; }
-      .yellow { background: #eab308; }
-      .red { background: #ef4444; }
+      .green { background: var(--success); }
+      .yellow { background: var(--warn); }
+      .red { background: var(--error); }
       main { max-width: 1200px; margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
-      section { background: #0b1323; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; }
+      .hero { background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%); border-radius: 12px; padding: 20px; color: #0b1021; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
+      .hero h1 { margin: 0 0 6px; font-size: 26px; }
+      .hero p { margin: 0; color: #e0f2fe; }
+      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: 0 12px 20px rgba(0, 0, 0, 0.12); }
       h2 { margin-top: 0; }
-      code { background: #111827; padding: 2px 4px; border-radius: 6px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+      .muted { color: var(--muted); font-size: 14px; }
+      .stack { display: grid; gap: 12px; }
+      label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+      input, textarea, select { width: 100%; background: #0b1323; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 10px; font-size: 14px; }
+      textarea { min-height: 120px; font-family: 'JetBrains Mono', monospace; }
+      button { background: var(--accent); color: #0b1021; border: none; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 14px rgba(56, 189, 248, 0.25); }
+      button.secondary { background: #1f2937; color: var(--text); box-shadow: none; }
+      button.inline { padding: 8px 12px; font-size: 13px; }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      details { border: 1px solid var(--border); border-radius: 10px; background: var(--panel-alt); padding: 12px 12px 4px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02); }
+      details + details { margin-top: 10px; }
+      summary { font-weight: 600; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
+      summary::-webkit-details-marker { display: none; }
+      .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 20px; border: 1px solid var(--border); padding: 4px 10px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+      .badge.good { color: var(--success); border-color: rgba(34, 197, 94, 0.4); }
+      .badge.warn { color: var(--warn); border-color: rgba(245, 158, 11, 0.4); }
+      .badge.error { color: var(--error); border-color: rgba(239, 68, 68, 0.4); }
+      .pill-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      .flex { display: flex; gap: 12px; }
+      .half { flex: 1; }
+      .table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .table th, .table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+      .table th { background: #111827; color: var(--muted); }
+      .log { background: #0b1323; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; white-space: pre-wrap; max-height: 220px; overflow: auto; }
+      .pill-tag { display: inline-flex; gap: 6px; align-items: center; padding: 4px 8px; border-radius: 12px; background: #111827; color: var(--muted); border: 1px solid var(--border); }
+      .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 14px; border-radius: 10px; background: #111827; border: 1px solid var(--border); color: var(--text); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25); display: none; min-width: 260px; }
+      .toast.show { display: block; }
+      .inline-input { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+      .divider { height: 1px; background: var(--border); margin: 8px 0; }
+      @media (max-width: 700px) {
+        header { flex-direction: column; align-items: flex-start; gap: 12px; }
+        main { padding: 16px; }
+      }
     </style>
   </head>
   <body>
     <header>
-      <div class="logo">SFDX Toolkit — Secure Automation Console</div>
+      <div>
+        <div class="logo">SFDX Toolkit — Secure Automation Console</div>
+        <div class="muted" id="userSummary">Authenticate to begin</div>
+      </div>
       <div class="pill-row" id="servicePills"></div>
     </header>
+
     <main>
-      <section>
-        <h2>Finalized Architecture Snapshot</h2>
-        <ul>
-          <li>Multi-tenant isolation enforced under <code>/userdata/&lt;userId&gt;/</code> for projects and orgs.</li>
-          <li>Three SFDX workspaces per project: <strong>source</strong>, <strong>destination</strong>, <strong>deploy</strong>.</li>
-          <li>Chunked retrieval, diff + delta generation, and deploy pipelines exposed as API endpoints.</li>
-          <li>JWT-authenticated dashboard with PM2-managed background worker for long-running jobs.</li>
-        </ul>
+      <section class="hero">
+        <h1>End-to-end SFDX flows in one secure console</h1>
+        <p>Register/login, create a project, onboard orgs, generate manifests, retrieve metadata, diff, build a delta, and deploy — all within the per-user sandbox.</p>
       </section>
-      <section>
-        <h2>Workflow Controls</h2>
-        <ol>
-          <li>Register/login via <code>/api/auth</code>.</li>
-          <li>Create a project at <code>/api/projects</code> → attach orgs → generate manifests.</li>
-          <li>Retrieve metadata per target, compare, and deploy from the isolated <code>deploy</code> folder.</li>
-          <li>Use the pills above to confirm database, sandbox isolation, and PM2 background services.</li>
-        </ol>
-      </section>
-      <section>
-        <h2>Full Feature Checklist</h2>
-        <ul>
-          <li>Source/Destination manifests can be generated and edited independently; delta + destructive manifests built from diff.</li>
-          <li>Chunked retrieval writes per-type files and logs for both <code>source</code> and <code>destination</code>.</li>
-          <li>Diffing walks the filesystem, exports CSV, and auto-builds delta/destructive manifests.</li>
-          <li>Deploy simulator supports <code>testLevel</code>, <code>runTests</code>, <code>checkOnly</code>, component overrides, and auto-retry.</li>
-          <li>History endpoints expose retrievals, comparisons, and deployments; admin endpoints expose user/project/org summaries.</li>
-        </ul>
+
+      <div class="grid">
+        <section class="panel stack">
+          <h2>Quick status</h2>
+          <div class="pill-list" id="quickSummary"></div>
+          <div class="divider"></div>
+          <div class="muted">Service pills refresh every 10s and reflect database, sandbox isolation, and PM2 worker availability.</div>
+        </section>
+        <section class="panel stack">
+          <h2>Active project</h2>
+          <div class="row">
+            <select id="projectSelect"></select>
+            <button class="inline" id="refreshProjects">Refresh</button>
+          </div>
+          <div class="divider"></div>
+          <div class="stack">
+            <div class="pill-tag"><strong>Source Org:</strong> <span id="sourceOrgLabel">—</span></div>
+            <div class="pill-tag"><strong>Destination Org:</strong> <span id="destOrgLabel">—</span></div>
+            <div class="pill-tag"><strong>Workspace root:</strong> <span id="workspaceLabel">—</span></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel stack">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <h2 style="margin: 0;">Workflow accordion</h2>
+          <div class="pill-tag">Follow steps 1 → 6</div>
+        </div>
+        <details open>
+          <summary>1) Authenticate</summary>
+          <div class="grid">
+            <div class="stack">
+              <label for="registerEmail">Register</label>
+              <input id="registerEmail" placeholder="email" />
+              <input id="registerPassword" type="password" placeholder="password" />
+              <button id="registerBtn">Create account</button>
+            </div>
+            <div class="stack">
+              <label for="loginEmail">Login</label>
+              <input id="loginEmail" placeholder="email" />
+              <input id="loginPassword" type="password" placeholder="password" />
+              <button id="loginBtn">Login</button>
+              <button class="secondary" id="logoutBtn">Logout</button>
+            </div>
+          </div>
+        </details>
+
+        <details>
+          <summary>2) Projects &amp; Orgs</summary>
+          <div class="grid">
+            <div class="stack">
+              <label>New project</label>
+              <input id="projectName" placeholder="Project name" />
+              <button id="createProjectBtn">Create &amp; scaffold</button>
+              <div class="muted">Creates source/destination/deploy folders under your sandboxed root.</div>
+            </div>
+            <div class="stack">
+              <label>Attach org aliases</label>
+              <select id="sourceAlias"></select>
+              <select id="destAlias"></select>
+              <button id="attachOrgsBtn">Attach to project</button>
+              <div class="muted">Orgs are stored at <code>/userdata/&lt;userId&gt;/orgs/&lt;alias&gt;</code>.</div>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="grid">
+            <div class="stack">
+              <label>Add org</label>
+              <input id="orgAlias" placeholder="Org alias" />
+              <textarea id="orgAuth" placeholder='Auth JSON (e.g. { "accessToken": "mock" })'></textarea>
+              <textarea id="orgInfo" placeholder='Org info JSON (e.g. { "apiVersion": "59.0" })'></textarea>
+              <button id="addOrgBtn">Save org</button>
+            </div>
+            <div class="stack">
+              <div class="row" style="justify-content: space-between; align-items: center;">
+                <label>My orgs</label>
+                <button class="inline secondary" id="refreshOrgs">Refresh list</button>
+              </div>
+              <div id="orgList" class="stack"></div>
+            </div>
+          </div>
+        </details>
+
+        <details>
+          <summary>3) Manifests</summary>
+          <div class="grid">
+            <div class="stack">
+              <label>Type list (JSON)</label>
+              <textarea id="typeJson">[
+  { "name": "CustomObject", "members": ["Account", "Contact"] },
+  { "name": "ApexClass", "members": ["SampleController"] },
+  { "name": "AuraDefinitionBundle", "members": ["SampleBundle"] }
+]</textarea>
+              <div class="row">
+                <button class="inline" data-generate="source">Generate source</button>
+                <button class="inline" data-generate="destination">Generate destination</button>
+                <button class="inline" data-generate="delta">Generate delta</button>
+              </div>
+              <button class="secondary inline" id="loadManifests">Load manifests</button>
+            </div>
+            <div class="stack">
+              <label>Source manifest</label>
+              <textarea id="sourceManifest"></textarea>
+              <button class="inline" data-save="source">Save source</button>
+            </div>
+            <div class="stack">
+              <label>Destination manifest</label>
+              <textarea id="destManifest"></textarea>
+              <button class="inline" data-save="destination">Save destination</button>
+            </div>
+            <div class="stack">
+              <label>Delta manifest</label>
+              <textarea id="deltaManifest"></textarea>
+              <button class="inline" data-save="delta">Save delta</button>
+            </div>
+          </div>
+        </details>
+
+        <details>
+          <summary>4) Retrievals</summary>
+          <div class="stack">
+            <label>Type list (JSON)</label>
+            <textarea id="retrieveTypes">[
+  { "name": "CustomObject", "members": ["Account"] },
+  { "name": "ApexClass", "members": ["SampleController"] }
+]</textarea>
+            <div class="row">
+              <button class="inline" data-retrieve="source">Retrieve source</button>
+              <button class="inline" data-retrieve="destination">Retrieve destination</button>
+            </div>
+            <div class="log" id="retrieveLog">Run a retrieval to see log info.</div>
+          </div>
+        </details>
+
+        <details>
+          <summary>5) Diff &amp; Delta</summary>
+          <div class="stack">
+            <button id="compareBtn">Generate comparison &amp; delta package</button>
+            <div class="log" id="diffLog">Awaiting comparison run.</div>
+            <div id="diffTableWrap"></div>
+          </div>
+        </details>
+
+        <details>
+          <summary>6) Deploy</summary>
+          <div class="grid">
+            <div class="stack">
+              <label>Deploy options</label>
+              <select id="testLevel">
+                <option value="NoTestRun">NoTestRun</option>
+                <option value="RunLocalTests">RunLocalTests</option>
+                <option value="RunAllTestsInOrg">RunAllTestsInOrg</option>
+                <option value="RunSpecifiedTests">RunSpecifiedTests</option>
+              </select>
+              <input id="runTests" placeholder="Comma separated test classes (for RunSpecifiedTests)" />
+              <div class="row">
+                <label class="row" style="gap:6px;">
+                  <input type="checkbox" id="checkOnly" /> Check only
+                </label>
+                <label class="row" style="gap:6px;">
+                  <input type="checkbox" id="autoRetry" checked /> Auto retry
+                </label>
+              </div>
+              <input id="manifestOverride" placeholder="Optional manifest path override" />
+              <input id="componentFilter" placeholder="Optional components (comma separated)" />
+              <button id="deployBtn">Deploy</button>
+            </div>
+            <div class="stack">
+              <label>Deployment log</label>
+              <div class="log" id="deployLog">Run a deployment to see details.</div>
+            </div>
+          </div>
+        </details>
+
+        <details>
+          <summary>History &amp; activity</summary>
+          <div class="grid">
+            <div class="stack">
+              <div class="row" style="justify-content: space-between; align-items: center;">
+                <h3 style="margin:0;">Retrievals</h3>
+                <button class="inline secondary" id="refreshHistory">Refresh</button>
+              </div>
+              <div id="historyRetrievals" class="stack"></div>
+            </div>
+            <div class="stack">
+              <h3 style="margin:0;">Comparisons</h3>
+              <div id="historyComparisons" class="stack"></div>
+            </div>
+            <div class="stack">
+              <h3 style="margin:0;">Deployments</h3>
+              <div id="historyDeployments" class="stack"></div>
+            </div>
+          </div>
+        </details>
       </section>
     </main>
+
+    <div class="toast" id="toast"></div>
+
     <script>
+      const state = {
+        token: localStorage.getItem('token') || '',
+        userEmail: localStorage.getItem('userEmail') || '',
+        projects: [],
+        orgs: [],
+        currentProject: null,
+        manifests: { source: '', destination: '', delta: '' },
+        compare: null
+      };
+
+      function showToast(message, tone = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.style.borderColor = tone === 'error' ? 'rgba(239,68,68,0.5)' : tone === 'success' ? 'rgba(34,197,94,0.5)' : 'var(--border)';
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3500);
+      }
+
+      function updateUserSummary() {
+        const summary = document.getElementById('userSummary');
+        if (state.token) {
+          summary.textContent = `Logged in as ${state.userEmail}`;
+        } else {
+          summary.textContent = 'Authenticate to begin';
+        }
+      }
+
+      async function authedFetch(path, options = {}) {
+        if (!state.token) throw new Error('Login required');
+        const res = await fetch(path, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${state.token}`,
+            ...(options.headers || {})
+          }
+        });
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg || 'Request failed');
+        }
+        const text = await res.text();
+        return text ? JSON.parse(text) : {};
+      }
+
+      function renderOrgs() {
+        const container = document.getElementById('orgList');
+        container.innerHTML = '';
+        if (!state.orgs.length) {
+          container.innerHTML = '<div class="muted">No orgs saved yet.</div>';
+          return;
+        }
+        state.orgs.forEach((org) => {
+          const div = document.createElement('div');
+          div.className = 'pill-tag';
+          div.innerHTML = `<strong>${org.alias}</strong><span>${org.info?.apiVersion || 'api?'}</span>`;
+          container.appendChild(div);
+        });
+        const sourceAlias = document.getElementById('sourceAlias');
+        const destAlias = document.getElementById('destAlias');
+        [sourceAlias, destAlias].forEach((sel) => {
+          sel.innerHTML = '<option value="">Select org</option>' + state.orgs.map((o) => `<option value="${o.alias}">${o.alias}</option>`).join('');
+        });
+      }
+
+      function renderProjects() {
+        const select = document.getElementById('projectSelect');
+        if (!state.projects.length) {
+          select.innerHTML = '<option value="">No projects yet</option>';
+          return;
+        }
+        select.innerHTML = state.projects
+          .map((p) => `<option value="${p.id}" ${state.currentProject?.id === p.id ? 'selected' : ''}>${p.name}</option>`)
+          .join('');
+        if (!state.currentProject && state.projects.length) {
+          select.value = state.projects[0].id;
+          state.currentProject = state.projects[0];
+          handleProjectChange();
+        }
+      }
+
+      function renderQuickSummary() {
+        const container = document.getElementById('quickSummary');
+        const items = [
+          { label: 'Projects', value: state.projects.length },
+          { label: 'Orgs', value: state.orgs.length },
+          { label: 'Current project', value: state.currentProject ? state.currentProject.name : '—' }
+        ];
+        container.innerHTML = items.map((i) => `<div class="pill-tag"><strong>${i.label}:</strong> <span>${i.value}</span></div>`).join('');
+        const workspaceLabel = document.getElementById('workspaceLabel');
+        workspaceLabel.textContent = state.currentProject ? `/userdata/<userId>/projects/${state.currentProject.name}` : '—';
+        document.getElementById('sourceOrgLabel').textContent = state.currentProject?.sourceOrg || 'Unassigned';
+        document.getElementById('destOrgLabel').textContent = state.currentProject?.destinationOrg || 'Unassigned';
+      }
+
+      function renderManifests() {
+        document.getElementById('sourceManifest').value = state.manifests.source || '';
+        document.getElementById('destManifest').value = state.manifests.destination || '';
+        document.getElementById('deltaManifest').value = state.manifests.delta || '';
+      }
+
+      function renderDiff(changes) {
+        const wrap = document.getElementById('diffTableWrap');
+        if (!changes || !changes.length) {
+          wrap.innerHTML = '<div class="muted">No changes detected yet.</div>';
+          return;
+        }
+        const rows = changes
+          .map((c) => `<tr><td>${c.type}</td><td>${c.name}</td><td>${c.status}</td></tr>`)
+          .join('');
+        wrap.innerHTML = `<table class="table"><thead><tr><th>Type</th><th>Name</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+
+      function renderHistory(data) {
+        const retrievals = document.getElementById('historyRetrievals');
+        retrievals.innerHTML = data.retrievals.length
+          ? data.retrievals
+              .map((r) => `<div class="pill-tag"><span>${r.target}</span><span>${r.count} items</span><span>${new Date(r.createdAt).toLocaleString()}</span></div>`)
+              .join('')
+          : '<div class="muted">No retrievals yet.</div>';
+        const comparisons = document.getElementById('historyComparisons');
+        comparisons.innerHTML = data.comparisons.length
+          ? data.comparisons
+              .map((c) => `<div class="pill-tag"><span>${c.changes.length} changes</span><span>${new Date(c.createdAt).toLocaleString()}</span></div>`)
+              .join('')
+          : '<div class="muted">No comparisons yet.</div>';
+        const deployments = document.getElementById('historyDeployments');
+        deployments.innerHTML = data.deployments.length
+          ? data.deployments
+              .map((d) => `<div class="pill-tag"><span>${d.outcome}</span><span>${d.deployedComponents.length} components</span><span>${new Date(d.createdAt).toLocaleString()}</span></div>`)
+              .join('')
+          : '<div class="muted">No deployments yet.</div>';
+      }
+
       async function refreshPills() {
         const container = document.getElementById('servicePills');
         container.innerHTML = '';
@@ -69,13 +431,11 @@
             const dot = document.createElement('span');
             const color = value.status === 'connected' || value.status === 'running' || value.status === 'locked' ? 'green' : value.status === 'degraded' ? 'yellow' : 'red';
             dot.className = `status-dot ${color}`;
-            pill.appendChild(dot);
             const label = document.createElement('span');
             label.textContent = `${key.toUpperCase()} — ${value.status}`;
-            pill.appendChild(label);
             const detail = document.createElement('small');
             detail.textContent = value.details || '';
-            pill.appendChild(detail);
+            pill.append(dot, label, detail);
             container.appendChild(pill);
           });
         } catch (err) {
@@ -89,8 +449,313 @@
           container.appendChild(pill);
         }
       }
+
+      async function loadProjects() {
+        if (!state.token) return;
+        try {
+          const projects = await authedFetch('/api/projects');
+          state.projects = projects;
+          renderProjects();
+          renderQuickSummary();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function loadOrgs() {
+        if (!state.token) return;
+        try {
+          const orgs = await authedFetch('/api/orgs');
+          state.orgs = orgs;
+          renderOrgs();
+          renderQuickSummary();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function loadManifests(projectId) {
+        if (!projectId) return;
+        try {
+          const manifestData = await authedFetch(`/api/projects/${projectId}/manifests`);
+          state.manifests = manifestData;
+          renderManifests();
+          showToast('Manifests loaded', 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function loadHistory(projectId) {
+        if (!projectId) return;
+        try {
+          const history = await authedFetch(`/api/projects/${projectId}/history`);
+          renderHistory(history);
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function handleProjectChange() {
+        const select = document.getElementById('projectSelect');
+        const projectId = select.value;
+        state.currentProject = state.projects.find((p) => p.id === projectId) || null;
+        renderQuickSummary();
+        if (state.currentProject) {
+          await loadManifests(state.currentProject.id);
+          await loadHistory(state.currentProject.id);
+        }
+      }
+
+      async function register() {
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        try {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          state.token = data.token;
+          state.userEmail = data.user.email;
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('userEmail', data.user.email);
+          updateUserSummary();
+          showToast('Registered and logged in', 'success');
+          await loadProjects();
+          await loadOrgs();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function login() {
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          state.token = data.token;
+          state.userEmail = data.user.email;
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('userEmail', data.user.email);
+          updateUserSummary();
+          showToast('Logged in', 'success');
+          await loadProjects();
+          await loadOrgs();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      function logout() {
+        state.token = '';
+        state.userEmail = '';
+        state.projects = [];
+        state.orgs = [];
+        state.currentProject = null;
+        state.manifests = { source: '', destination: '', delta: '' };
+        localStorage.removeItem('token');
+        localStorage.removeItem('userEmail');
+        renderProjects();
+        renderOrgs();
+        renderManifests();
+        renderQuickSummary();
+        updateUserSummary();
+        showToast('Logged out');
+      }
+
+      async function createProject() {
+        const name = document.getElementById('projectName').value;
+        if (!name) return showToast('Project name required', 'error');
+        try {
+          const data = await authedFetch('/api/projects', {
+            method: 'POST',
+            body: JSON.stringify({ name })
+          });
+          state.projects.push(data);
+          state.currentProject = data;
+          renderProjects();
+          renderQuickSummary();
+          showToast('Project created', 'success');
+          await loadManifests(data.id);
+          await loadHistory(data.id);
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function addOrg() {
+        const alias = document.getElementById('orgAlias').value;
+        let auth;
+        let info;
+        try {
+          auth = JSON.parse(document.getElementById('orgAuth').value || '{}');
+          info = JSON.parse(document.getElementById('orgInfo').value || '{}');
+        } catch (err) {
+          return showToast('Invalid JSON in auth/info', 'error');
+        }
+        if (!alias) return showToast('Alias required', 'error');
+        try {
+          await authedFetch('/api/orgs', {
+            method: 'POST',
+            body: JSON.stringify({ alias, auth, info })
+          });
+          showToast('Org saved', 'success');
+          await loadOrgs();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function attachOrgs() {
+        if (!state.currentProject) return showToast('Select a project', 'error');
+        const sourceOrg = document.getElementById('sourceAlias').value || null;
+        const destinationOrg = document.getElementById('destAlias').value || null;
+        try {
+          const data = await authedFetch(`/api/projects/${state.currentProject.id}/orgs`, {
+            method: 'POST',
+            body: JSON.stringify({ sourceOrg, destinationOrg })
+          });
+          state.currentProject = data;
+          state.projects = state.projects.map((p) => (p.id === data.id ? data : p));
+          renderQuickSummary();
+          showToast('Orgs attached', 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function generateManifest(type) {
+        if (!state.currentProject) return showToast('Select a project', 'error');
+        let types;
+        try {
+          types = JSON.parse(document.getElementById('typeJson').value || '[]');
+        } catch (err) {
+          return showToast('Invalid JSON for metadata types', 'error');
+        }
+        try {
+          const res = await authedFetch(`/api/projects/${state.currentProject.id}/manifests/${type}/generate`, {
+            method: 'POST',
+            body: JSON.stringify({ types })
+          });
+          state.manifests[type] = res.xml;
+          renderManifests();
+          showToast(`${type} manifest generated`, 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function saveManifest(type) {
+        if (!state.currentProject) return showToast('Select a project', 'error');
+        const xml = document.getElementById(type === 'destination' ? 'destManifest' : `${type}Manifest`).value;
+        try {
+          await authedFetch(`/api/projects/${state.currentProject.id}/manifests/${type}`, {
+            method: 'POST',
+            body: JSON.stringify({ xml })
+          });
+          state.manifests[type] = xml;
+          showToast(`${type} manifest saved`, 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function runRetrieval(target) {
+        if (!state.currentProject) return showToast('Select a project', 'error');
+        let types;
+        try {
+          types = JSON.parse(document.getElementById('retrieveTypes').value || '[]');
+        } catch (err) {
+          return showToast('Invalid JSON for retrieval types', 'error');
+        }
+        try {
+          const res = await authedFetch(`/api/projects/${state.currentProject.id}/retrieve/${target}`, {
+            method: 'POST',
+            body: JSON.stringify({ types })
+          });
+          document.getElementById('retrieveLog').textContent = `${res.message}\nLog: ${res.logPath}\nEntries: ${res.entries.length}`;
+          await loadHistory(state.currentProject.id);
+          showToast(`Retrieval complete for ${target}`, 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function runCompare() {
+        if (!state.currentProject) return showToast('Select a project', 'error');
+        try {
+          const res = await authedFetch(`/api/projects/${state.currentProject.id}/compare`, { method: 'POST' });
+          state.compare = res;
+          document.getElementById('diffLog').textContent = `${res.message}\nDiff CSV: ${res.diffLog}\nDelta manifest: ${res.deltaManifest}\nDestructive: ${res.destructiveManifest}`;
+          renderDiff(res.changes);
+          await loadManifests(state.currentProject.id);
+          await loadHistory(state.currentProject.id);
+          showToast('Comparison ready', 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      async function runDeploy() {
+        if (!state.currentProject) return showToast('Select a project', 'error');
+        const testLevel = document.getElementById('testLevel').value;
+        const runTests = document.getElementById('runTests').value
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const checkOnly = document.getElementById('checkOnly').checked;
+        const autoRetry = document.getElementById('autoRetry').checked;
+        const manifestPath = document.getElementById('manifestOverride').value || undefined;
+        const components = document.getElementById('componentFilter').value
+          .split(',')
+          .map((c) => c.trim())
+          .filter(Boolean);
+        try {
+          const res = await authedFetch(`/api/projects/${state.currentProject.id}/deploy`, {
+            method: 'POST',
+            body: JSON.stringify({ testLevel, runTests, checkOnly, autoRetry, manifestPath, components })
+          });
+          document.getElementById('deployLog').textContent = `${res.message}\nOutcome: ${res.result.outcome}\nLog: ${res.deployLog}\nComponents: ${res.result.deployedComponents.join(', ')}`;
+          await loadHistory(state.currentProject.id);
+          showToast('Deployment simulated', 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      document.getElementById('registerBtn').addEventListener('click', register);
+      document.getElementById('loginBtn').addEventListener('click', login);
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('createProjectBtn').addEventListener('click', createProject);
+      document.getElementById('addOrgBtn').addEventListener('click', addOrg);
+      document.getElementById('attachOrgsBtn').addEventListener('click', attachOrgs);
+      document.getElementById('projectSelect').addEventListener('change', handleProjectChange);
+      document.getElementById('refreshProjects').addEventListener('click', loadProjects);
+      document.getElementById('refreshOrgs').addEventListener('click', loadOrgs);
+      document.querySelectorAll('button[data-generate]').forEach((btn) => btn.addEventListener('click', () => generateManifest(btn.dataset.generate)));
+      document.getElementById('loadManifests').addEventListener('click', () => state.currentProject && loadManifests(state.currentProject.id));
+      document.querySelectorAll('button[data-save]').forEach((btn) => btn.addEventListener('click', () => saveManifest(btn.dataset.save)));
+      document.querySelectorAll('button[data-retrieve]').forEach((btn) => btn.addEventListener('click', () => runRetrieval(btn.dataset.retrieve)));
+      document.getElementById('compareBtn').addEventListener('click', runCompare);
+      document.getElementById('deployBtn').addEventListener('click', runDeploy);
+      document.getElementById('refreshHistory').addEventListener('click', () => state.currentProject && loadHistory(state.currentProject.id));
+
       refreshPills();
       setInterval(refreshPills, 10000);
+      updateUserSummary();
+      if (state.token) {
+        loadProjects();
+        loadOrgs();
+      }
     </script>
   </body>
 </html>

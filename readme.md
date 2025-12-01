@@ -41,7 +41,13 @@ npm run pm2     # runs API + metadata worker under pm2
 - `GET /api/services/status` → status for pills in the top bar.
 
 ## Frontend
-Open `http://localhost:3000` to see the summarized architecture and a top bar showing service connectivity.
+Open `http://localhost:3000` to use the full accordion-based console:
+
+- Register/login and the token is stored locally for subsequent calls.
+- Create/select a project and attach saved org aliases as source/destination.
+- Generate or edit source/destination/delta manifests, then retrieve metadata from each side.
+- Run a comparison to produce CSV, delta, and destructive manifests, then launch a deploy with test-level and retry options.
+- View retrieval, comparison, and deployment history plus service/worker status pills at the top bar.
 
 ## Security model
 - All file paths are validated to stay under the requesting user's `userdata/<userId>` root.
