@@ -3,9 +3,9 @@ import fs from 'fs';
 import { userRoot } from '../config.js';
 
 export function resolveUserPath(userId, ...segments) {
-  const base = path.join(userRoot, userId);
-  const target = path.join(base, ...segments);
-  if (!target.startsWith(path.resolve(base))) {
+  const base = path.resolve(path.join(userRoot, userId));
+  const target = path.resolve(path.join(base, ...segments));
+  if (!target.startsWith(base)) {
     throw new Error('Path escapes user sandbox');
   }
   return target;
@@ -30,7 +30,16 @@ export function projectPaths(userId, projectName) {
     destination: path.join(root, 'destination'),
     deploy: path.join(root, 'deploy')
   };
-  [paths.root, paths.source, paths.destination, paths.deploy, path.join(paths.deploy, 'logs')].forEach((dir) => {
+  [
+    paths.root,
+    paths.source,
+    paths.destination,
+    paths.deploy,
+    path.join(paths.deploy, 'logs'),
+    path.join(paths.source, 'manifest'),
+    path.join(paths.destination, 'manifest'),
+    path.join(paths.deploy, 'manifest')
+  ].forEach((dir) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }

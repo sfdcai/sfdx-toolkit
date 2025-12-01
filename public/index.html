@@ -45,6 +45,16 @@
           <li>Use the pills above to confirm database, sandbox isolation, and PM2 background services.</li>
         </ol>
       </section>
+      <section>
+        <h2>Full Feature Checklist</h2>
+        <ul>
+          <li>Source/Destination manifests can be generated and edited independently; delta + destructive manifests built from diff.</li>
+          <li>Chunked retrieval writes per-type files and logs for both <code>source</code> and <code>destination</code>.</li>
+          <li>Diffing walks the filesystem, exports CSV, and auto-builds delta/destructive manifests.</li>
+          <li>Deploy simulator supports <code>testLevel</code>, <code>runTests</code>, <code>checkOnly</code>, component overrides, and auto-retry.</li>
+          <li>History endpoints expose retrievals, comparisons, and deployments; admin endpoints expose user/project/org summaries.</li>
+        </ul>
+      </section>
     </main>
     <script>
       async function refreshPills() {
