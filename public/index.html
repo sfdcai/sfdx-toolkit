@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SFDX Toolkit</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #0e1117; color: #f1f5f9; }
+      header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #111827; border-bottom: 1px solid #1f2937; position: sticky; top: 0; }
+      .logo { font-weight: 700; letter-spacing: 0.4px; }
+      .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid #1f2937; background: #0b1323; color: #cbd5e1; }
+      .pill span { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+      .green { background: #22c55e; }
+      .yellow { background: #eab308; }
+      .red { background: #ef4444; }
+      main { max-width: 1200px; margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
+      section { background: #0b1323; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; }
+      h2 { margin-top: 0; }
+      code { background: #111827; padding: 2px 4px; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">SFDX Toolkit — Secure Automation Console</div>
+      <div class="pill-row" id="servicePills"></div>
+    </header>
+    <main>
+      <section>
+        <h2>Finalized Architecture Snapshot</h2>
+        <ul>
+          <li>Multi-tenant isolation enforced under <code>/userdata/&lt;userId&gt;/</code> for projects and orgs.</li>
+          <li>Three SFDX workspaces per project: <strong>source</strong>, <strong>destination</strong>, <strong>deploy</strong>.</li>
+          <li>Chunked retrieval, diff + delta generation, and deploy pipelines exposed as API endpoints.</li>
+          <li>JWT-authenticated dashboard with PM2-managed background worker for long-running jobs.</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Workflow Controls</h2>
+        <ol>
+          <li>Register/login via <code>/api/auth</code>.</li>
+          <li>Create a project at <code>/api/projects</code> → attach orgs → generate manifests.</li>
+          <li>Retrieve metadata per target, compare, and deploy from the isolated <code>deploy</code> folder.</li>
+          <li>Use the pills above to confirm database, sandbox isolation, and PM2 background services.</li>
+        </ol>
+      </section>
+      <section>
+        <h2>Full Feature Checklist</h2>
+        <ul>
+          <li>Source/Destination manifests can be generated and edited independently; delta + destructive manifests built from diff.</li>
+          <li>Chunked retrieval writes per-type files and logs for both <code>source</code> and <code>destination</code>.</li>
+          <li>Diffing walks the filesystem, exports CSV, and auto-builds delta/destructive manifests.</li>
+          <li>Deploy simulator supports <code>testLevel</code>, <code>runTests</code>, <code>checkOnly</code>, component overrides, and auto-retry.</li>
+          <li>History endpoints expose retrievals, comparisons, and deployments; admin endpoints expose user/project/org summaries.</li>
+        </ul>
+      </section>
+    </main>
+    <script>
+      async function refreshPills() {
+        const container = document.getElementById('servicePills');
+        container.innerHTML = '';
+        try {
+          const response = await fetch('/api/services/status');
+          const data = await response.json();
+          Object.entries(data).forEach(([key, value]) => {
+            const pill = document.createElement('div');
+            pill.className = 'pill';
+            const dot = document.createElement('span');
+            const color = value.status === 'connected' || value.status === 'running' || value.status === 'locked' ? 'green' : value.status === 'degraded' ? 'yellow' : 'red';
+            dot.className = `status-dot ${color}`;
+            pill.appendChild(dot);
+            const label = document.createElement('span');
+            label.textContent = `${key.toUpperCase()} — ${value.status}`;
+            pill.appendChild(label);
+            const detail = document.createElement('small');
+            detail.textContent = value.details || '';
+            pill.appendChild(detail);
+            container.appendChild(pill);
+          });
+        } catch (err) {
+          const pill = document.createElement('div');
+          pill.className = 'pill';
+          const dot = document.createElement('span');
+          dot.className = 'status-dot red';
+          const text = document.createElement('span');
+          text.textContent = 'SERVICES — offline';
+          pill.append(dot, text);
+          container.appendChild(pill);
+        }
+      }
+      refreshPills();
+      setInterval(refreshPills, 10000);
+    </script>
+  </body>
+</html>
