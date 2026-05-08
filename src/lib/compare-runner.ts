@@ -13,6 +13,7 @@ import {
   writeComparisonCsv,
   writeComparisonHtmlReport
 } from './metadata';
+import { filterManifestXmlByRegistry } from './manifest-filter';
 import { getProject, listComparisons, updateComparison, JobRecord } from './store';
 import { projectPaths, resolveUserPath } from './path';
 
@@ -197,9 +198,10 @@ export async function runCompareJob(job: JobRecord) {
       const changes = Array.isArray(recent?.changes) ? recent.changes : [];
       if (changes.length) {
         const tempPath = path.join(jobDir, 'delta-manifest.xml');
-        const deltaXml = generateDeltaManifest(tempPath, changes as any[]);
-        sourceManifestXml = deltaXml || '';
-        destManifestXml = deltaXml || '';
+        const deltaXmlRaw = generateDeltaManifest(tempPath, changes as any[]);
+        const filteredDelta = filterManifestXmlByRegistry(deltaXmlRaw || '');
+        sourceManifestXml = filteredDelta.xml || '';
+        destManifestXml = filteredDelta.xml || '';
       }
     }
 
@@ -328,7 +330,10 @@ export async function runCompareJob(job: JobRecord) {
       destinationOrg: project.destinationOrg,
       changes
     });
-    const deltaXml = generateDeltaManifest(deltaSnapshot, changes);
+    const deltaXmlRaw = generateDeltaManifest(deltaSnapshot, changes);
+    const filteredDelta = filterManifestXmlByRegistry(deltaXmlRaw);
+    const deltaXml = filteredDelta.xml;
+    fs.writeFileSync(deltaSnapshot, deltaXml, 'utf8');
     const destructiveXml = generateDestructiveChanges(destructiveSnapshot, changes);
     updateStage('analyze', 'done');
     updateStage('report', 'running');
@@ -342,6 +347,7 @@ export async function runCompareJob(job: JobRecord) {
       reportRelPath,
       deltaXml,
       destructiveXml,
+      skippedUnsupportedTypes: filteredDelta.skippedTypes,
       changesCount: changes.length,
       changes
     };

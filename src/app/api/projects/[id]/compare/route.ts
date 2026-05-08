@@ -6,6 +6,7 @@ import { getAuthUser } from '@/lib/api';
 import { getProject, saveComparison } from '@/lib/store';
 import { projectPaths, resolveUserPath } from '@/lib/path';
 import { diffWorkspaces, generateDeltaManifest, generateDestructiveChanges, writeComparisonCsv, writeComparisonHtmlReport } from '@/lib/metadata';
+import { filterManifestXmlByRegistry } from '@/lib/manifest-filter';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const user = getAuthUser(req as any);
@@ -30,7 +31,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const reportRelPath = path.relative(paths.root, reportPath);
   const deltaManifest = paths.manifests.delta;
   const destructiveManifest = path.join(paths.deploy, 'manifest', 'destructiveChanges.xml');
-  const deltaXml = generateDeltaManifest(deltaManifest, changes);
+  const deltaXmlRaw = generateDeltaManifest(deltaManifest, changes);
+  const filteredDelta = filterManifestXmlByRegistry(deltaXmlRaw);
+  const deltaXml = filteredDelta.xml;
+  fs.writeFileSync(deltaManifest, deltaXml, 'utf8');
   const destructiveXml = generateDestructiveChanges(destructiveManifest, changes);
   const deltaSnapshot = path.join(jobDir, 'delta-package.xml');
   const destructiveSnapshot = path.join(jobDir, 'destructiveChanges.xml');
@@ -62,6 +66,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     destructiveManifest,
     deltaXml,
     destructiveXml,
+    skippedUnsupportedTypes: filteredDelta.skippedTypes,
+    registryPath: filteredDelta.registryPath,
     changes,
     jobId,
     record

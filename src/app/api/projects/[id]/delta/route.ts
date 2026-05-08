@@ -5,6 +5,7 @@ import { getProject } from '@/lib/store';
 import path from 'path';
 import { projectPaths } from '@/lib/path';
 import { generateDeltaManifest, generateDestructiveChanges } from '@/lib/metadata';
+import { filterManifestXmlByRegistry } from '@/lib/manifest-filter';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const user = getAuthUser(req as any);
@@ -21,13 +22,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const included = changes.filter((item: any) => item.status === 'Added' || item.status === 'Changed');
   const selection = included.map((item: any) => item.relPath).filter(Boolean);
   fs.writeFileSync(selectionPath, JSON.stringify({ updatedAt: new Date().toISOString(), selection }, null, 2), 'utf8');
-  const deltaXml = generateDeltaManifest(paths.manifests.delta, changes);
+  const deltaXmlRaw = generateDeltaManifest(paths.manifests.delta, changes);
+  const filteredDelta = filterManifestXmlByRegistry(deltaXmlRaw);
+  const deltaXml = filteredDelta.xml;
+  fs.writeFileSync(paths.manifests.delta, deltaXml, 'utf8');
   const destructiveXml = generateDestructiveChanges(path.join(paths.deploy, 'manifest', 'destructiveChanges.xml'), changes);
   return NextResponse.json({
     message: 'Delta manifest updated',
     deltaXml,
     destructiveXml,
     selectedCount,
-    selectionCount: selection.length
+    selectionCount: selection.length,
+    skippedUnsupportedTypes: filteredDelta.skippedTypes,
+    registryPath: filteredDelta.registryPath
   });
 }
