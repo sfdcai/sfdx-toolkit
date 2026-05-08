@@ -626,10 +626,32 @@ export default function Home() {
     return res.json();
   }
 
+  function extractManifestVersion(xml: string) {
+    const match = xml.match(/<version>\s*([^<]+)\s*<\/version>/i);
+    return match?.[1]?.trim() || "";
+  }
+
+  function resolveValidationVersion(xml: string) {
+    const active = state.activeProject;
+    if (!active) return extractManifestVersion(xml) || undefined;
+    const preferredAlias = active.destinationOrg || active.sourceOrg || "";
+    const orgAlias = String(orgDetails?.alias || "");
+    const orgApiVersion = String(orgDetails?.info?.apiVersion || orgDetails?.info?.apiVersionNumber || "").trim();
+    if (preferredAlias && orgAlias === preferredAlias && orgApiVersion) {
+      return orgApiVersion;
+    }
+    return extractManifestVersion(xml) || undefined;
+  }
+
   async function validateManifestForProject(projectId: string, xml: string) {
+    const version = resolveValidationVersion(xml);
     const data = await api(`/api/projects/${projectId}/manifests/validate`, {
       method: "POST",
-      body: JSON.stringify({ xml }),
+      body: JSON.stringify({
+        xml,
+        channel: "metadataApi",
+        ...(version ? { version } : {})
+      }),
     });
     return {
       xml: String(data?.xml || ""),
