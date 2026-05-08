@@ -126,7 +126,7 @@ function findLatestRegistryFile() {
     .sort((a, b) => b.mtimeMs - a.mtimeMs)[0]?.candidate;
 }
 
-function loadSupportedMetadataTypes() {
+export function loadSupportedMetadataTypes() {
   const registryPath = findLatestRegistryFile();
   if (!registryPath) return { supportedTypes: null as Set<string> | null, registryPath: null };
 

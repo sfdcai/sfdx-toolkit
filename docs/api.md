@@ -21,7 +21,7 @@ This document lists the main API endpoints and their purpose. All endpoints expe
 - `GET /api/projects/:id/manifests` — load manifests
 - `POST /api/projects/:id/manifests/:type` — save manifest (source/destination/delta)
 - `POST /api/projects/:id/manifests/:type/generate` — generate manifest
-- `POST /api/projects/:id/manifests/validate` — validate + normalize manifest XML for deploy-ready package format
+- `POST /api/projects/:id/manifests/validate` — validate + normalize manifest XML; optional coverage filtering by `{ channel, version }` and registry filtering for deploy-ready package format
 - `POST /api/projects/:id/retrieve/:target` — run retrieve (chunked)
 - `GET /api/projects/:id/retrieve/:target/status` — retrieve status
 - `POST /api/projects/:id/retrieve/:target/stop` — stop retrieve
