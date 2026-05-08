@@ -1,24 +1,53 @@
 {
-  "name": "sfdx-toolkit",
+  "name": "sfdx-toolkit-0.0.1",
   "version": "0.1.0",
-  "description": "Secure multi-user SFDX automation toolkit with manifests, diff, and deploy flows",
-  "main": "src/server.js",
-  "type": "module",
+  "private": true,
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "pm2": "pm2 start ecosystem.config.js",
-    "lint": "echo 'No lint configured'"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "pm2:start": "node scripts/pm2-start.cjs",
+    "lint": "eslint",
+    "migrate:json-db": "node scripts/migrate-json-to-db.cjs",
+    "integrity:check": "node scripts/integrity-check.cjs",
+    "integrity:fix": "node scripts/integrity-check.cjs --fix",
+    "ai:insights": "node scripts/generate-ai-insights.cjs",
+    "scan:static": "node scripts/run-static-scan.cjs",
+    "doc:org": "node scripts/generate-org-doc.cjs",
+    "sf:update:check": "node scripts/check-sf-cli-update.cjs --check-only",
+    "sf:update:run": "node scripts/check-sf-cli-update.cjs",
+    "sf:update:install-service": "node scripts/install-sf-cli-update-service.cjs",
+    "mcp:start": "node mcp-server/server.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
+    "better-sqlite3": "^9.6.0",
+    "diff": "^5.2.0",
+    "diff2html": "^3.4.51",
     "jsonwebtoken": "^9.0.2",
+    "lru-cache": "^11.2.7",
+    "marked": "^12.0.2",
     "nanoid": "^5.0.3",
-    "pm2": "^5.4.2"
+    "next": "14.2.5",
+    "otplib": "^13.4.0",
+    "qrcode": "^1.5.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^18.2.79",
+    "@types/react-dom": "^18.2.25",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.5",
+    "playwright": "^1.59.1",
+    "pm2": "^6.0.14",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5"
   }
 }

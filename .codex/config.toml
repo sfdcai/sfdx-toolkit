@@ -1,0 +1,10 @@
+[mcp_servers.sfdx-toolkit]
+command = "npm"
+args = ["run", "mcp:start"]
+
+[mcp_servers.sfdx-toolkit.env]
+APP_BASE_URL = "http://127.0.0.1:3000"
+APP_TOKEN = "${APP_TOKEN}"
+
+[mcp_servers.gitmcp-sfdx-toolkit]
+url = "https://gitmcp.io/sfdcai/sfdx-toolkit"
