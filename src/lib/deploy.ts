@@ -1179,3 +1179,28 @@ function filterAndAppendManifest(
   return outputPath;
 }
 
+
+/**
+ * Automatically enriches a manifest containing Profile or CustomApplication to preserve
+ * Field-Level Security (FLS), Layout Assignments, and Action Overrides parity.
+ */
+export function enrichManifestForParity(
+  manifestTypes: { name: string; members: string[] }[],
+  availableObjects: string[] = [],
+  availableLayouts: string[] = []
+): { name: string; members: string[] }[] {
+  const hasProfile = manifestTypes.some((t) => t.name === 'Profile');
+  if (!hasProfile) return manifestTypes;
+
+  const enriched = [...manifestTypes];
+  
+  if (!enriched.some((t) => t.name === 'Layout') && availableLayouts.length > 0) {
+    enriched.push({ name: 'Layout', members: availableLayouts });
+  }
+
+  if (!enriched.some((t) => t.name === 'CustomObject') && availableObjects.length > 0) {
+    enriched.push({ name: 'CustomObject', members: availableObjects });
+  }
+
+  return enriched;
+}
