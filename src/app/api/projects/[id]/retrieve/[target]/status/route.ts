@@ -20,6 +20,18 @@ export async function GET(req: Request, { params }: { params: { id: string; targ
   if (!fs.existsSync(statusPath)) {
     return NextResponse.json({ message: 'Retrieve status not found' }, { status: 404 });
   }
-  const status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
-  return NextResponse.json(status);
+  const stat = fs.statSync(statusPath);
+  const etag = `W/"${stat.size}-${Math.floor(stat.mtimeMs)}"`;
+  const clientEtag = req.headers.get('if-none-match');
+  if (clientEtag && clientEtag === etag) {
+    return new Response(null, { status: 304, headers: { ETag: etag } });
+  }
+  const raw = fs.readFileSync(statusPath, 'utf8');
+  return new Response(raw, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      ETag: etag
+    }
+  });
 }

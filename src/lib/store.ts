@@ -81,6 +81,20 @@ export type DeploymentRecord = {
   createdAt: string;
 };
 
+export type AgentRunRecord = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  jobId: string;
+  status: 'running' | 'healed' | 'failed';
+  diagnosticSummary?: string | null;
+  healersApplied?: string[] | null;
+  filesModified?: string[] | null;
+  retryJobId?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
 export type UpgradeRequestRecord = {
   id: string;
   tenantId: string;
@@ -200,10 +214,10 @@ function defaultTenant(db = getDb()) {
 function getDefaultTenantPlan() {
   const db = getDb();
   const row = db.prepare('SELECT value_json FROM settings WHERE key = ?').get('default_tenant_plan') as { value_json?: string } | undefined;
-  if (!row?.value_json) return 'free';
+  if (!row?.value_json) return 'pro';
   try {
     const value = JSON.parse(row.value_json);
-    return typeof value === 'string' ? value : 'free';
+    return typeof value === 'string' ? value : 'pro';
   } catch {
     return 'free';
   }
@@ -259,7 +273,7 @@ export function getTenantByDomain(domain: string) {
   } as TenantRecord;
 }
 
-export function createTenant(name: string, domain: string, plan: TenantPlan = 'free') {
+export function createTenant(name: string, domain: string, plan: TenantPlan = 'pro') {
   const db = getDb();
   const id = `tenant_${nanoid(10)}`;
   const createdAt = new Date().toISOString();
@@ -1385,3 +1399,80 @@ export function listAuditLogs(limit = 100) {
     createdAt: row.created_at
   })) as AuditLogEntry[];
 }
+
+export function saveAgentRun(record: Omit<AgentRunRecord, 'id' | 'createdAt'>) {
+  const db = getDb();
+  const entry: AgentRunRecord = { ...record, id: crypto.randomUUID().replace(/-/g,"").substring(0, 16), createdAt: new Date().toISOString() };
+  db.prepare(
+    'INSERT INTO agent_runs (id, tenant_id, project_id, job_id, status, diagnostic_summary, healers_applied, files_modified, retry_job_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(
+    entry.id,
+    entry.tenantId,
+    entry.projectId,
+    entry.jobId,
+    entry.status,
+    entry.diagnosticSummary ?? null,
+    entry.healersApplied ? JSON.stringify(entry.healersApplied) : null,
+    entry.filesModified ? JSON.stringify(entry.filesModified) : null,
+    entry.retryJobId ?? null,
+    entry.createdAt
+  );
+  return entry;
+}
+
+export function updateAgentRun(id: string, fields: Partial<Omit<AgentRunRecord, 'id' | 'createdAt' | 'tenantId' | 'projectId' | 'jobId'>>) {
+  const db = getDb();
+  const updates: string[] = [];
+  const values: any[] = [];
+  const setIf = (column: string, value: any, serialize = false) => {
+    if (value === undefined) return;
+    updates.push(`${column} = ?`);
+    values.push(serialize ? JSON.stringify(value) : value);
+  };
+  setIf('status', fields.status);
+  setIf('diagnostic_summary', fields.diagnosticSummary);
+  setIf('healers_applied', fields.healersApplied, true);
+  setIf('files_modified', fields.filesModified, true);
+  setIf('retry_job_id', fields.retryJobId);
+  setIf('completed_at', fields.completedAt);
+  if (!updates.length) return;
+  db.prepare(`UPDATE agent_runs SET ${updates.join(', ')} WHERE id = ?`).run(...values, id);
+}
+
+export function getAgentRun(id: string): AgentRunRecord | undefined {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM agent_runs WHERE id = ?').get(id) as any;
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    projectId: row.project_id,
+    jobId: row.job_id,
+    status: row.status,
+    diagnosticSummary: row.diagnostic_summary,
+    healersApplied: row.healers_applied ? JSON.parse(row.healers_applied) : [],
+    filesModified: row.files_modified ? JSON.parse(row.files_modified) : [],
+    retryJobId: row.retry_job_id,
+    createdAt: row.created_at,
+    completedAt: row.completed_at
+  };
+}
+
+export function listAgentRunsForProject(projectId: string): AgentRunRecord[] {
+  const db = getDb();
+  const rows = db.prepare('SELECT * FROM agent_runs WHERE project_id = ? ORDER BY created_at DESC').all(projectId) as any[];
+  return rows.map((row: any) => ({
+    id: row.id,
+    tenantId: row.tenant_id,
+    projectId: row.project_id,
+    jobId: row.job_id,
+    status: row.status,
+    diagnosticSummary: row.diagnostic_summary,
+    healersApplied: row.healers_applied ? JSON.parse(row.healers_applied) : [],
+    filesModified: row.files_modified ? JSON.parse(row.files_modified) : [],
+    retryJobId: row.retry_job_id,
+    createdAt: row.created_at,
+    completedAt: row.completed_at
+  }));
+}
+

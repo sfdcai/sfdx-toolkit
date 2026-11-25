@@ -4,9 +4,25 @@ const { execFileSync, spawn } = require('child_process');
 function listPortPids(port) {
   try {
     const output = execFileSync('ss', ['-ltnp'], { encoding: 'utf8' });
-    return Array.from(output.matchAll(new RegExp(`:${port}\\s+.*?pid=(\\d+)`, 'g')))
-      .map((match) => Number.parseInt(match[1], 10))
-      .filter((pid) => Number.isInteger(pid));
+    const lines = output.split('\n');
+    const pids = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.includes(`:${port} `) || line.includes(`:${port}\t`)) {
+        let merged = line;
+        if (i + 1 < lines.length && !lines[i + 1].trim().startsWith('LISTEN') && lines[i + 1].includes('pid=')) {
+          merged += ' ' + lines[i + 1];
+        }
+        const match = merged.match(/pid=(\d+)/);
+        if (match) {
+          const pid = Number.parseInt(match[1], 10);
+          if (Number.isInteger(pid)) {
+            pids.push(pid);
+          }
+        }
+      }
+    }
+    return pids;
   } catch {
     return [];
   }

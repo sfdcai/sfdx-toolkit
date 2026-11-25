@@ -17,20 +17,30 @@ export type RetrieveManifestBatch = {
 };
 
 const TOP_LEVEL_METADATA_MAP: Record<string, string> = {
+  apexEmailNotifications: 'ApexEmailNotifications',
   appMenus: 'AppMenu',
   applications: 'CustomApplication',
   audience: 'Audience',
+  aura: 'AuraDefinitionBundle',
   callCenters: 'CallCenter',
   certs: 'Certificate',
+  classes: 'ApexClass',
   cleanDataServices: 'CleanDataService',
   components: 'ApexComponent',
+  connectedApps: 'ConnectedApp',
   contentassets: 'ContentAsset',
   cspTrustedSites: 'CspTrustedSite',
+  customMetadata: 'CustomMetadata',
+  customPermissions: 'CustomPermission',
+  dashboards: 'Dashboard',
   dataSourceObjects: 'DataSourceObject',
   digitalExperienceConfigs: 'DigitalExperienceConfig',
   digitalExperiences: 'DigitalExperienceBundle',
+  documents: 'Document',
   duplicateRules: 'DuplicateRule',
+  email: 'EmailTemplate',
   emailservices: 'EmailServicesFunction',
+  experiences: 'ExperienceBundle',
   externalClientApps: 'ExternalClientApplication',
   extlClntAppGlobalOauthSets: 'ExtlClntAppGlobalOauthSettings',
   extlClntAppOauthPolicies: 'ExtlClntAppOauthConfigurablePolicies',
@@ -39,8 +49,13 @@ const TOP_LEVEL_METADATA_MAP: Record<string, string> = {
   fieldRestrictionRules: 'FieldRestrictionRule',
   flexipages: 'FlexiPage',
   flowDefinitions: 'FlowDefinition',
+  flows: 'Flow',
+  globalValueSets: 'GlobalValueSet',
   installedPackages: 'InstalledPackage',
+  labels: 'CustomLabels',
+  layouts: 'Layout',
   letterhead: 'Letterhead',
+  lwc: 'LightningComponentBundle',
   managedTopics: 'ManagedTopics',
   matchingRules: 'MatchingRules',
   mktDataConnections: 'MktDataConnection',
@@ -50,20 +65,61 @@ const TOP_LEVEL_METADATA_MAP: Record<string, string> = {
   networkBranding: 'NetworkBranding',
   networks: 'Network',
   objectTranslations: 'CustomObjectTranslation',
+  objects: 'CustomObject',
+  pages: 'ApexPage',
   pathAssistants: 'PathAssistant',
+  permissionsetgroups: 'PermissionSetGroup',
+  permissionsets: 'PermissionSet',
   profilePasswordPolicies: 'ProfilePasswordPolicy',
   profileSessionSettings: 'ProfileSessionSetting',
+  profiles: 'Profile',
   quickActions: 'QuickAction',
+  remoteSiteSettings: 'RemoteSiteSetting',
+  reportTypes: 'ReportType',
+  reports: 'Report',
   samlssoconfigs: 'SamlSsoConfig',
+  sharingRules: 'SharingRules',
   sites: 'CustomSite',
   standardValueSets: 'StandardValueSet',
+  staticresources: 'StaticResource',
   tabs: 'CustomTab',
   topicsForObjects: 'TopicsForObjects',
-  userCriteria: 'UserCriteria'
+  triggers: 'ApexTrigger',
+  userCriteria: 'UserCriteria',
+  workflows: 'Workflow'
 };
 
 function ensureDir(targetPath: string) {
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+}
+
+export const METADATA_FOLDERS = new Set([
+  'classes', 'triggers', 'pages', 'components', 'flows', 'layouts', 'workflows',
+  'sharingRules', 'businessProcessTypeDefinitions', 'aura', 'lwc', 'staticresources',
+  'labels', 'permissionsets', 'permissionsetgroups', 'profiles', 'globalValueSets', 'remoteSiteSettings',
+  'customMetadata', 'moderation', 'reports', 'reportTypes', 'dashboards', 'documents', 'email',
+  'experiences', 'digitalExperiences', 'digitalExperienceConfigs', 'objects', 'settings', 'flexipages', 'tabs',
+  'quickActions', 'customPermissions', 'connectedApps', 'applications', 'duplicateRules',
+  'matchingRules', 'standardValueSets', 'networks', 'networkBranding', 'navigationMenus'
+]);
+
+export function parseMetadataPath(relPath: string) {
+  const parts = relPath.split(path.sep).filter(Boolean);
+  const folderIndex = parts.findIndex(p => METADATA_FOLDERS.has(p));
+  if (folderIndex !== -1) {
+    return {
+      prefix: parts.slice(0, folderIndex),
+      bundleType: parts[folderIndex],
+      bundleName: parts[folderIndex + 1] || '',
+      subParts: parts.slice(folderIndex)
+    };
+  }
+  return {
+    prefix: [],
+    bundleType: parts[0] || '',
+    bundleName: parts[1] || '',
+    subParts: parts
+  };
 }
 
 export function ensureSfdxProject(rootDir: string, overrideApiVersion?: string) {
@@ -72,29 +128,72 @@ export function ensureSfdxProject(rootDir: string, overrideApiVersion?: string) 
   if (!fs.existsSync(forceAppDir)) {
     fs.mkdirSync(forceAppDir, { recursive: true });
   }
-  const desiredPackageDirectories = [{ path: '.', default: true }];
+  const desiredPackageDirectories = [{ path: 'force-app', default: true }];
   const desiredApiVersion = overrideApiVersion || apiVersion;
 
   if (fs.existsSync(projectFile)) {
     try {
       const existing = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
       const next = {
+        name: existing.name || 'sf-new-org',
+        namespace: existing.namespace || '',
+        sfdcLoginUrl: existing.sfdcLoginUrl || 'https://login.salesforce.com',
         ...existing,
         packageDirectories: desiredPackageDirectories,
         sourceApiVersion: desiredApiVersion
       };
       fs.writeFileSync(projectFile, JSON.stringify(next, null, 2), 'utf8');
-      return;
     } catch {
-      // Fall through to rewrite an invalid project file.
+      const content = {
+        packageDirectories: desiredPackageDirectories,
+        name: 'sf-new-org',
+        namespace: '',
+        sfdcLoginUrl: 'https://login.salesforce.com',
+        sourceApiVersion: desiredApiVersion
+      };
+      fs.writeFileSync(projectFile, JSON.stringify(content, null, 2), 'utf8');
     }
+  } else {
+    const content = {
+      packageDirectories: desiredPackageDirectories,
+      name: 'sf-new-org',
+      namespace: '',
+      sfdcLoginUrl: 'https://login.salesforce.com',
+      sourceApiVersion: desiredApiVersion
+    };
+    fs.writeFileSync(projectFile, JSON.stringify(content, null, 2), 'utf8');
   }
 
-  const content = {
-    packageDirectories: desiredPackageDirectories,
-    sourceApiVersion: desiredApiVersion
-  };
-  fs.writeFileSync(projectFile, JSON.stringify(content, null, 2), 'utf8');
+  // Ensure standard .forceignore exists
+  const forceIgnoreFile = path.join(rootDir, '.forceignore');
+  if (!fs.existsSync(forceIgnoreFile)) {
+    const forceIgnoreContent = `# List files or directories below to ignore them when running force:source:push, force:source:pull, and force:source:status\npackage.xml\n\n# LWC configuration files\n**/jsconfig.json\n**/.eslintrc.json\n\n# LWC Jest\n**/__tests__/**\n`;
+    fs.writeFileSync(forceIgnoreFile, forceIgnoreContent, 'utf8');
+  }
+
+  // Ensure standard package.json exists
+  const packageJsonFile = path.join(rootDir, 'package.json');
+  if (!fs.existsSync(packageJsonFile)) {
+    const packageJsonContent = {
+      name: 'sf-new-org',
+      version: '1.0.0',
+      description: 'SFDX project created by sfdx-toolkit',
+      scripts: {
+        test: 'echo "Error: no test specified" && exit 1'
+      },
+      devDependencies: {
+        prettier: '3.4.1',
+        'prettier-plugin-apex': '2.2.2'
+      }
+    };
+    fs.writeFileSync(packageJsonFile, JSON.stringify(packageJsonContent, null, 2), 'utf8');
+  }
+
+  // Ensure manifest directory exists
+  const manifestDir = path.join(rootDir, 'manifest');
+  if (!fs.existsSync(manifestDir)) {
+    fs.mkdirSync(manifestDir, { recursive: true });
+  }
 }
 
 export function buildPackageXml(types: ManifestType[] = [], version = apiVersion) {
@@ -136,13 +235,17 @@ export function normalizeManifestXml(xml = '', fallbackVersion = apiVersion) {
       .map((member) => String(member || '').trim())
       .filter(Boolean);
     members.forEach((member) => {
-      if (member === '*') {
+      const normalizedMember = normalizeMemberName(String(member || '').trim(), typeName);
+      if (!normalizedMember) return;
+
+      if (normalizedMember === '*') {
         memberSet.clear();
         memberSet.add('*');
         return;
       }
-      if (!memberSet.has('*')) memberSet.add(member);
+      if (!memberSet.has('*')) memberSet.add(normalizedMember);
     });
+
   });
 
   const normalizedTypes = Array.from(typesMap.entries())
@@ -336,8 +439,6 @@ export async function runRetrieveChunked({
       tempManifest,
       '--target-org',
       targetOrg,
-      '--output-dir',
-      outputDir,
       ...versionArg,
       '--json'
     ];
@@ -465,15 +566,17 @@ export function generateManifestFromOrg(manifestPath: string, orgAlias: string, 
   }
   args.push('--json');
   const command = `${sfCommand} ${args.join(' ')}`;
-  const timeoutMs = Number(process.env.SF_MANIFEST_TIMEOUT_MS || '60000');
+  const timeoutMs = Number(process.env.SF_MANIFEST_TIMEOUT_MS || '300000');
   let stdout = '';
   try {
     stdout = execFileSync(sfCommand, args, {
       encoding: 'utf8',
       cwd,
       env: getSfEnv(),
-      timeout: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 60000
+      timeout: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 300000,
+      maxBuffer: 50 * 1024 * 1024
     }).trim();
+
   } catch (err) {
     if (err instanceof Error && 'code' in err && (err.code === 'ETIMEDOUT' || err.code === 'SIGTERM')) {
       throw new Error(`Manifest generation timed out after ${timeoutMs}ms.`);
@@ -527,9 +630,7 @@ export function retrieveMetadataChunked({
       '--manifest',
       tempManifest,
       '--target-org',
-      targetOrg,
-      '--output-dir',
-      outputDir
+      targetOrg
     ];
     if (orgApiVersion) {
       args.push('--api-version', orgApiVersion);
@@ -537,7 +638,13 @@ export function retrieveMetadataChunked({
     args.push('--json');
     const command = `${sfCommand} ${args.join(' ')}`;
     try {
-      const stdout = execFileSync(sfCommand, args, { encoding: 'utf8', cwd: outputDir, env: getSfEnv() });
+      const stdout = execFileSync(sfCommand, args, { 
+        encoding: 'utf8', 
+        cwd: outputDir, 
+        env: getSfEnv(),
+        maxBuffer: 50 * 1024 * 1024
+      });
+
       const parsed = parseSfJson(stdout);
       entries.push({ type: type.name, member: members.join(',') || '*', status: 'Retrieved' });
       outputs.push({ type: type.name, manifest: tempManifest, status: 'Retrieved' });
@@ -562,7 +669,7 @@ function walkFiles(baseDir: string) {
   const results: Record<string, string> = {};
   if (!fs.existsSync(baseDir)) return results;
   const stack = [baseDir];
-  const ignoredDirs = new Set(['manifest', 'logs', '.sf', '.sfdx', '.git']);
+  const ignoredDirs = new Set(['manifest', 'logs', '.sf', '.sfdx', '.git', 'node_modules']);
   while (stack.length) {
     const current = stack.pop() as string;
     const stats = fs.statSync(current);
@@ -572,7 +679,18 @@ function walkFiles(baseDir: string) {
       fs.readdirSync(current).forEach((child) => stack.push(path.join(current, child)));
     } else {
       const rel = path.relative(baseDir, current);
-      if (rel === 'sfdx-project.json') continue;
+      const baseName = path.basename(rel);
+      if ([
+        'sfdx-project.json',
+        'package.json',
+        'package-lock.json',
+        '.forceignore',
+        '.gitignore',
+        '.prettierrc',
+        '.prettierignore'
+      ].includes(baseName) || rel.includes('node_modules')) {
+        continue;
+      }
       results[rel] = fs.readFileSync(current, 'utf8');
     }
   }
@@ -602,9 +720,8 @@ function stripMeta(name: string) {
 }
 
 export function mapRelPathToMetadata(relPath: string) {
-  const parts = relPath.split(path.sep).filter(Boolean);
-  const top = parts[0] || '';
-  const file = parts[parts.length - 1] || '';
+  const { bundleType: top, subParts } = parseMetadataPath(relPath);
+  const file = subParts[subParts.length - 1] || '';
   const base = stripMeta(file);
 
   if (top === 'classes') return { type: 'ApexClass', name: base };
@@ -616,11 +733,20 @@ export function mapRelPathToMetadata(relPath: string) {
   if (top === 'workflows') return { type: 'Workflow', name: base };
   if (top === 'sharingRules') return { type: 'SharingRules', name: base };
   if (top === 'businessProcessTypeDefinitions') return { type: 'BusinessProcessTypeDefinition', name: base };
-  if (top === 'aura') return { type: 'AuraDefinitionBundle', name: parts[1] || base };
-  if (top === 'lwc') return { type: 'LightningComponentBundle', name: parts[1] || base };
+  if (top === 'aura') return { type: 'AuraDefinitionBundle', name: subParts[1] || base };
+  if (top === 'lwc') return { type: 'LightningComponentBundle', name: subParts[1] || base };
+  if (top === 'digitalExperiences') {
+    const siteType = subParts[1] || '';
+    const siteName = subParts[2] || '';
+    if (siteType && siteName) return { type: 'DigitalExperienceBundle', name: `${siteType}/${siteName}` };
+    return { type: 'DigitalExperienceBundle', name: siteType || base };
+  }
   if (top === 'staticresources') return { type: 'StaticResource', name: base };
   if (top === 'labels') return { type: 'CustomLabels', name: 'CustomLabels' };
   if (top === 'permissionsets') return { type: 'PermissionSet', name: base };
+  if (top === 'permissionsetgroups') return { type: 'PermissionSetGroup', name: base };
+  if (top === 'reportTypes') return { type: 'ReportType', name: base };
+  if (top === 'experiences') return { type: 'ExperienceBundle', name: subParts[1] || base };
   if (top === 'profiles') return { type: 'Profile', name: base };
   if (top === 'globalValueSets') return { type: 'GlobalValueSet', name: base };
   if (top === 'remoteSiteSettings') return { type: 'RemoteSiteSetting', name: base };
@@ -629,18 +755,21 @@ export function mapRelPathToMetadata(relPath: string) {
     if (/\.keywords-meta\.xml$/i.test(file)) return { type: 'KeywordList', name: base };
     if (/\.rule-meta\.xml$/i.test(file)) return { type: 'ModerationRule', name: base };
   }
+  if (top === 'settings') {
+    return { type: `${base}Settings`, name: base };
+  }
   if (TOP_LEVEL_METADATA_MAP[top]) return { type: TOP_LEVEL_METADATA_MAP[top], name: base };
   if (['reports', 'dashboards', 'documents', 'email'].includes(top)) {
     if (/\.reportFolder-meta\.xml$/i.test(file)) return { type: 'ReportFolder', name: base };
     if (/\.dashboardFolder-meta\.xml$/i.test(file)) return { type: 'DashboardFolder', name: base };
     if (/\.emailFolder-meta\.xml$/i.test(file)) return { type: 'EmailFolder', name: base };
     if (/\.documentFolder-meta\.xml$/i.test(file)) return { type: 'DocumentFolder', name: base };
-    const folder = parts[1] || 'unfiled';
+    const folder = subParts[1] || 'unfiled';
     return { type: top === 'email' ? 'EmailTemplate' : top.slice(0, -1).replace(/^./, (c) => c.toUpperCase()), name: `${folder}/${base}` };
   }
   if (top === 'objects') {
-    const obj = parts[1] || 'Unknown';
-    const section = parts[2] || '';
+    const obj = subParts[1] || 'Unknown';
+    const section = subParts[2] || '';
     if (section === 'fields') return { type: 'CustomField', name: `${obj}.${base}` };
     if (section === 'recordTypes') return { type: 'RecordType', name: `${obj}.${base}` };
     if (section === 'validationRules') return { type: 'ValidationRule', name: `${obj}.${base}` };
@@ -660,7 +789,7 @@ export function mapRelPathToMetadata(relPath: string) {
   }
 
   const fallbackType = top || 'Unknown';
-  const fallbackName = parts.slice(1).join('/') || base || relPath;
+  const fallbackName = subParts.slice(1).join('/') || base || relPath;
   return { type: fallbackType, name: fallbackName };
 }
 
@@ -691,15 +820,46 @@ export function writeComparisonCsv(csvPath: string, changes: { type: string; nam
   return csvPath;
 }
 
-export function generateDeltaManifest(manifestPath: string, changes: { type: string; name: string; status: string }[]) {
+export function generateDeltaManifest(manifestPath: string, changes: { type: string; name: string; status: string; relPath?: string }[], sourceDir?: string) {
   const included = changes.filter((c) => c.status === 'Added' || c.status === 'Changed');
   const types: Record<string, string[]> = {};
+  
+  // Track detected Global Value Sets to avoid redundant scanning
+  const detectedGVS = new Set<string>();
+
   included.forEach((change) => {
     const normalized = normalizeChangeForManifest(change as { type: string; name: string; status: string; relPath?: string });
     if (!types[normalized.type]) types[normalized.type] = [];
-    const name = normalizeMemberName(normalized.name);
+    const name = normalizeMemberName(normalized.name, normalized.type);
     if (name) types[normalized.type].push(name);
+
+    // Scan for Global Value Sets in fields
+    if (sourceDir && change.relPath && change.relPath.endsWith('.field-meta.xml')) {
+      const fullPath = path.join(sourceDir, change.relPath);
+      if (fs.existsSync(fullPath)) {
+        try {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          const match = content.match(/<(?:globalValueSet|valueSetName)>(.*?)<\/(?:globalValueSet|valueSetName)>/);
+          if (match && match[1]) {
+            detectedGVS.add(match[1]);
+          }
+        } catch {
+          // Ignore read errors
+        }
+      }
+    }
   });
+
+  // Inject detected Global Value Sets into the manifest
+  if (detectedGVS.size > 0) {
+    if (!types['GlobalValueSet']) types['GlobalValueSet'] = [];
+    detectedGVS.forEach((gvs) => {
+      if (!types['GlobalValueSet'].includes(gvs)) {
+        types['GlobalValueSet'].push(gvs);
+      }
+    });
+  }
+
   const packageTypes = Object.entries(types).map(([name, members]) => ({
     name,
     members: [...new Set(members)]
@@ -1504,10 +1664,138 @@ export function writeComparisonHtmlReport(
   return html;
 }
 
-function normalizeMemberName(raw: string) {
+const MEMBER_BLACKLIST = new Set([
+  'BillingAddress',
+  'ShippingAddress',
+  'MailingAddress',
+  'OtherAddress',
+  'Address',
+  'Name',
+  'Id',
+  'CreatedDate',
+  'CreatedById',
+  'LastModifiedDate',
+  'LastModifiedById',
+  'SystemModstamp',
+  'IsDeleted',
+  'LastViewedDate',
+  'LastReferencedDate',
+  'IsArchived',
+  'ConnectionReceivedId',
+  'ShippingAddress',
+  'MailingAddress',
+  'OtherAddress',
+  'Name',
+  'Id'
+]);
+
+const EXTENSION_PATTERN = /\.(cls|trigger|page|component|resource|resource-meta|app|tab|site|workflow|sharingRules|permissionset|profile|object|field|layout|flexipage|flow|report|dashboard|email|group|queue|role|user|test|suite|sql|yaml|yml|json|md|txt)$/i;
+
+export function normalizeMemberName(raw: string, type?: string) {
   if (!raw) return '';
   let name = raw.trim();
+  if (name === '*') {
+    return '*';
+  }
+  // Remove metadata suffixes
   name = name.replace(/\.meta\.xml$/i, '');
   name = name.replace(/-meta$/i, '');
+  // Remove common source extensions if present
+  name = name.replace(EXTENSION_PATTERN, '');
+
+  // 1. Blacklist check
+  if (MEMBER_BLACKLIST.has(name)) {
+    return '';
+  }
+
+  // 2. Namespace & System Filtering
+  // Exclude members from managed packages (e.g. purecloud__) 
+  // Exclude Data Cloud / System generated members (e.g. __dll, __dlm)
+  if (type !== 'InstalledPackage' && type !== 'Package') {
+    const parts = name.split('.');
+    
+    for (const part of parts) {
+      // a) Data Cloud Filtering (__dll, __dlm)
+      if (part.includes('__dll') || part.includes('__dlm')) {
+        return '';
+      }
+
+      // b) Managed components: namespace__field__c (two or more double underscores)
+      if ((part.match(/__/g) || []).length > 1) {
+         return '';
+      }
+      
+      // c) Other managed components without __c (e.g., purecloud__MyClass)
+      if (part.includes('__') && !part.endsWith('__c') && !part.endsWith('__mdt') && !part.endsWith('__r')) {
+         return '';
+      }
+    }
+  }
+
+
+
+  // 3. Handle object.field format
+  if (type === 'CustomField' && !name.includes('.')) {
+    return '';
+  }
+
+  if (name.includes('.')) {
+    const parts = name.split('.');
+    if (parts.length === 2 && MEMBER_BLACKLIST.has(parts[1])) {
+      return '';
+    }
+  }
+
+
+
   return name;
 }
+
+export function splitManifestIntoLayers(types: ManifestType[]) {
+  const infrastructure = new Set([
+    'Network',
+    'CustomSite',
+    'ExperienceBundle',
+    'DigitalExperienceBundle',
+    'DigitalExperienceConfig',
+    'DigitalExperience',
+    'SiteDotCom',
+    'NavigationMenu',
+    'StandardValueSet'
+  ]);
+  const rules = new Set([
+    'UserCriteria',
+    'ModerationRule',
+    'KeywordList',
+    'NetworkBranding',
+    'Audience',
+    'Layout'
+  ]);
+  const access = new Set([
+    'Profile',
+    'PermissionSet',
+    'PermissionSetGroup',
+    'SharingRules'
+  ]);
+
+  const layer1: ManifestType[] = []; // Infrastructure
+  const layer2: ManifestType[] = []; // Rules
+  const layer3: ManifestType[] = []; // Access
+  const layer0: ManifestType[] = []; // Everything else (standard)
+
+  types.forEach((type) => {
+    if (infrastructure.has(type.name)) {
+      layer1.push(type);
+    } else if (rules.has(type.name)) {
+      layer2.push(type);
+    } else if (access.has(type.name)) {
+      layer3.push(type);
+    } else {
+      layer0.push(type);
+    }
+  });
+
+  return { layer0, layer1, layer2, layer3 };
+}
+
+

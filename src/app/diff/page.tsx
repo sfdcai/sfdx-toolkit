@@ -17,7 +17,7 @@ export default function DiffPage() {
   const [filterType, setFilterType] = useState<string>("all");
   const [changesMap, setChangesMap] = useState<Record<string, { status: string }>>({});
   const [serviceDetails, setServiceDetails] = useState<any>(null);
-  const [theme, setTheme] = useState<"light" | "dark" | "sand" | "slate">("light");
+  const [theme, setTheme] = useState<"light" | "mint" | "dark" | "sand" | "slate">("light");
   const [user, setUser] = useState<{ id: string; email: string; role: string } | null>(null);
   const [token, setToken] = useState<string>("");
 
@@ -53,7 +53,7 @@ export default function DiffPage() {
   useEffect(() => {
     const saved = localStorage.getItem("theme");
     const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const next = saved === "dark" || saved === "sand" || saved === "slate" ? saved : prefersDark ? "dark" : "light";
+    const next = saved === "dark" || saved === "mint" || saved === "sand" || saved === "slate" ? saved : prefersDark ? "dark" : "light";
     setTheme(next);
     document.documentElement.dataset.theme = next;
   }, []);
@@ -189,7 +189,7 @@ export default function DiffPage() {
     }
   }
 
-  function handleThemeChange(next: "light" | "dark" | "sand" | "slate") {
+  function handleThemeChange(next: "light" | "mint" | "dark" | "sand" | "slate") {
     setTheme(next);
     localStorage.setItem("theme", next);
     document.documentElement.dataset.theme = next;
@@ -248,12 +248,11 @@ export default function DiffPage() {
             <select
               className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs"
               value={theme}
-              onChange={(event) => handleThemeChange(event.target.value as "light" | "dark" | "sand" | "slate")}
+              onChange={(event) => handleThemeChange(event.target.value as "light" | "mint" | "dark" | "sand" | "slate")}
             >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="sand">Sand</option>
-              <option value="slate">Slate</option>
+              <option value="light">⛅ Sky &amp; Slate</option>
+              <option value="mint">🌿 Cloud Mint</option>
+              <option value="dark">🌙 Twilight Dim</option>
             </select>
             <div className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs text-[var(--muted)]">
               {user ? `Signed in: ${user.email}` : "Not signed in"}

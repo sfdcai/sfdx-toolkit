@@ -31,15 +31,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const removedByCoverage: { type: string; reason: string }[] = [];
 
     if (channel) {
-      const { lookup, endpoint } = await fetchCoverageLookup(targetVersion || normalized.version);
-      coverageEndpoint = endpoint;
-      const coverageFiltered = filterTypesByCoverage(parseManifestComponents(responseXml), lookup, channel);
-      responseXml = buildPackageXml(coverageFiltered.kept, normalized.version);
-      coverageFiltered.removed.forEach((item) => removedByCoverage.push(item));
-      if (removedByCoverage.length) {
-        normalized.warnings.push(
-          `Removed ${removedByCoverage.length} type(s) unsupported for channel '${channel}'.`
-        );
+      try {
+        const { lookup, endpoint } = await fetchCoverageLookup(targetVersion || normalized.version);
+        coverageEndpoint = endpoint;
+        const coverageFiltered = filterTypesByCoverage(parseManifestComponents(responseXml), lookup, channel);
+        responseXml = buildPackageXml(coverageFiltered.kept, normalized.version);
+        coverageFiltered.removed.forEach((item) => removedByCoverage.push(item));
+        if (removedByCoverage.length) {
+          normalized.warnings.push(
+            `Removed ${removedByCoverage.length} type(s) unsupported for channel '${channel}'.`
+          );
+        }
+      } catch (coverageErr) {
+        // The external Metadata Coverage API can be unavailable (e.g. 404 for an API version
+        // it hasn't published yet). Degrade gracefully to the local registry — matching
+        // filterManifestXmlByRegistry — instead of failing the whole validation with a 400.
+        const reason = coverageErr instanceof Error ? coverageErr.message : 'unknown error';
+        console.error('Metadata Coverage API fetch failed during validate, using local registry only:', reason);
+        normalized.warnings.push('Metadata Coverage API check failed. Using local registry only.');
       }
     }
 

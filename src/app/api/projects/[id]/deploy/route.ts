@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const project = getProject(user.id, params.id);
   if (!project) return NextResponse.json({ message: 'Project not found' }, { status: 404 });
   const body = await req.json();
-  const { testLevel, runTests = [], checkOnly = false, autoRetry = true, retryLimit, manifestPath, components = [] } = body || {};
+  const { testLevel, runTests = [], checkOnly = false, autoRetry = true, retryLimit, manifestPath, components = [], ignoreDestructive = false, deployType = 'delta', manifestContent } = body || {};
   const normalizedRetryLimit = Math.max(1, Math.min(5, Number(retryLimit) || 3));
   const paths = projectPaths(user.id, project.name);
   const targetOrg = project.destinationOrg;
@@ -52,7 +52,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     autoRetry,
     retryLimit: normalizedRetryLimit,
     manifestPath: manifestPath || paths.manifests.delta,
-    components
+    components,
+    ignoreDestructive,
+    deployType,
+    manifestContent
   };
   const jobRecord = enqueueJob({
     id: jobId,

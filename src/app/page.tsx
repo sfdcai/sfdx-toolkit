@@ -1,5 +1,9 @@
 "use client";
 
+import { AuthCard } from "@/components/auth-card";
+import { ServerVersionBadge } from "@/components/server-version-badge";
+import { OrchestratorFlow } from "@/components/orchestrator-flow";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { translateError } from "@/lib/error-help";
 
@@ -33,6 +37,7 @@ type ReadinessIssue = {
 };
 
 const sectionGuides: Record<string, SectionGuide> = {
+
   dashboardSection: {
     eyebrow: "Start Here",
     title: "Read the workspace before you change anything",
@@ -164,6 +169,17 @@ const sectionGuides: Record<string, SectionGuide> = {
       "Clear the console when you want to isolate the next run."
     ],
     success: "You can troubleshoot CLI failures with direct evidence."
+  },
+  agentSection: {
+    eyebrow: "Autonomous AI Agent",
+    title: "AI Self-Healing Deployment Diagnostics & Audit logs",
+    summary: "Configure the Gemini LLM agent settings, manage the API key, and view healed deployment runs.",
+    steps: [
+      "Enable or disable the AI self-healing agent.",
+      "Enter a project-specific Gemini API Key (or rely on the global key if configured).",
+      "Inspect the audit logs of healed deployments to trace exactly what modifications were applied to metadata elements."
+    ],
+    success: "The AI agent is configured and its diagnostic run history is visible."
   }
 };
 
@@ -195,6 +211,9 @@ export default function Home() {
   const [compareStatus, setCompareStatus] = useState<any>(null);
   const [deployJobId, setDeployJobId] = useState<string>("");
   const [deployStatus, setDeployStatus] = useState<any>(null);
+  const [destructivePreview, setDestructivePreview] = useState<{ count: number; components: { name: string; members: string[] }[] }>({ count: 0, components: [] });
+  const [includeDeletions, setIncludeDeletions] = useState<boolean>(true);
+  const [showDeletionDetails, setShowDeletionDetails] = useState<boolean>(false);
   const [compareStrategy, setCompareStrategy] = useState<
     "existing" | "auto" | "custom" | "merge" | "scope" | "delta"
   >("existing");
@@ -221,7 +240,8 @@ export default function Home() {
   const [reportLoading, setReportLoading] = useState<boolean>(false);
   const [currentProcess, setCurrentProcess] = useState<string>("");
   const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "mfa">("login");
-  const [theme, setTheme] = useState<"light" | "dark" | "sand" | "slate">("light");
+  const [theme, setTheme] = useState<"light" | "mint" | "dark" | "sand" | "slate">("dark");
+  const [viewMode, setViewMode] = useState<"simple" | "advanced">("simple");
   const [projectEdits, setProjectEdits] = useState<Record<string, string>>({});
   const [selectedOrgAlias, setSelectedOrgAlias] = useState<string>("");
   const [orgDetails, setOrgDetails] = useState<any>(null);
@@ -248,6 +268,13 @@ export default function Home() {
   const [mfaCode, setMfaCode] = useState<string>("");
   const [mfaSetupSecret, setMfaSetupSecret] = useState<string>("");
   const [mfaSetupQr, setMfaSetupQr] = useState<string>("");
+
+  const [deployType, setDeployType] = useState<"delta" | "full" | "manifest">("delta");
+  const [customManifestXml, setCustomManifestXml] = useState<string>("");
+  const [agentConfig, setAgentConfig] = useState<{ enabled: boolean; maxRetries: number; hasApiKey: boolean; hasGlobalApiKey: boolean } | null>(null);
+  const [agentHistory, setAgentHistory] = useState<any[]>([]);
+  const [agentConfigLoading, setAgentConfigLoading] = useState<boolean>(false);
+  const [agentApiKeyInput, setAgentApiKeyInput] = useState<string>("");
   const [mfaSetupCode, setMfaSetupCode] = useState<string>("");
   const [mfaMessage, setMfaMessage] = useState<string>("");
   const [currentPassword, setCurrentPassword] = useState<string>("");
@@ -265,12 +292,18 @@ export default function Home() {
     jobSection: true,
     deploySection: true,
     historySection: true,
+    agentSection: true,
     cliConsoleSection: false
   });
   const [checklistCollapsed, setChecklistCollapsed] = useState<boolean>(false);
+  const [enabledFeatures, setEnabledFeatures] = useState<Record<string, boolean>>({});
+  const [insights, setInsights] = useState<any[]>([]);
+  const [scans, setScans] = useState<any[]>([]);
+  const [docs, setDocs] = useState<any[]>([]);
   const [navGroupState, setNavGroupState] = useState<Record<string, boolean>>({
     workflow: true,
     insights: true,
+    premium: true,
     account: false
   });
 
@@ -279,40 +312,68 @@ export default function Home() {
   const manifestReady = Boolean(sourceManifestValue.trim() && destManifestValue.trim());
   const canRunCompare = Boolean(state.activeProject?.id && state.activeProject?.sourceOrg && state.activeProject?.destinationOrg);
   const activeGuide = sectionGuides[activeSection] || sectionGuides.projectSection;
+  const premiumGroup = useMemo(() => {
+    const items = [];
+    if (enabledFeatures.ai_insights) {
+      items.push({ id: "aiInsightsSection", label: "AI Insights" });
+    }
+    if (enabledFeatures.static_scans) {
+      items.push({ id: "staticScansSection", label: "Static Scans" });
+    }
+    if (enabledFeatures.org_design_docs) {
+      items.push({ id: "orgDocsSection", label: "Org Docs" });
+    }
+    if (enabledFeatures.autonomous_healing) {
+      items.push({ id: "agentSection", label: "Autonomous Agent" });
+    }
+    if (items.length === 0) return null;
+    return {
+      id: "premium",
+      label: "AI & Insights",
+      items
+    };
+  }, [enabledFeatures]);
+
   const navGroups = useMemo(
-    () => [
-      {
-        id: "workflow",
-        label: "Workflow",
-        items: [
-          { id: "dashboardSection", label: "Dashboard" },
-          { id: "projectSection", label: "Project & Orgs" },
-          { id: "manifestSection", label: "Manifests" },
-          { id: "retrieveSection", label: "Retrieve" },
-          { id: "orchestratorSection", label: "Orchestrator", badge: jobRunning }
-        ]
-      },
-      {
-        id: "insights",
-        label: "Insights & Deploy",
-        items: [
-          { id: "diffSection", label: "Diff" },
-          { id: "reportSection", label: "Reports" },
-          { id: "jobSection", label: "Job Activity", badge: jobRunning },
-          { id: "deploySection", label: "Deploy" },
-          { id: "historySection", label: "History" }
-        ]
-      },
-      {
+    () => {
+      const groups = [
+        {
+          id: "workflow",
+          label: "Workflow",
+          items: [
+            { id: "dashboardSection", label: "Dashboard" },
+            { id: "projectSection", label: "Project & Orgs" },
+            { id: "manifestSection", label: "Manifests" },
+            { id: "retrieveSection", label: "Retrieve" },
+            { id: "orchestratorSection", label: "Orchestrator", badge: jobRunning }
+          ]
+        },
+        {
+          id: "insights",
+          label: "Insights & Deploy",
+          items: [
+            { id: "diffSection", label: "Diff" },
+            { id: "reportSection", label: "Reports" },
+            { id: "jobSection", label: "Job Activity", badge: jobRunning },
+            { id: "deploySection", label: "Deploy" },
+            { id: "historySection", label: "History" }
+          ]
+        }
+      ];
+      if (premiumGroup) {
+        groups.push(premiumGroup);
+      }
+      groups.push({
         id: "account",
         label: "Account & Console",
         items: [
           { id: "profileSection", label: "Profile" },
           { id: "cliConsoleSection", label: "CLI Console" }
         ]
-      }
-    ],
-    [jobRunning]
+      });
+      return groups;
+    },
+    [jobRunning, premiumGroup]
   );
   const hasSourceRetrieve = useMemo(
     () => historyData.retrievals.some((item: any) => item.target === "source"),
@@ -477,35 +538,47 @@ export default function Home() {
         cta: "Bind destination org"
       });
     }
-    if (!state.diffChanges.length) {
-      issues.push({
-        id: "deploy-diff",
-        label: "No diff has been generated",
-        detail: "Generate a diff so the delta manifest is based on reviewed change scope.",
-        section: "diffSection",
-        cta: "Open diff"
-      });
-    }
-    if (!selectedDiffCount) {
-      issues.push({
-        id: "deploy-selection",
-        label: "No changes are selected for the delta",
-        detail: "Select the changes you want to deploy before building or reviewing the delta manifest.",
-        section: "diffSection",
-        cta: "Review selections"
-      });
-    }
-    if (!deltaManifest.trim()) {
-      issues.push({
-        id: "deploy-manifest",
-        label: "Delta manifest is empty",
-        detail: "Build the delta manifest from the selected changes before deployment.",
-        section: "diffSection",
-        cta: "Build delta"
-      });
+    if (deployType === "delta") {
+      if (!state.diffChanges.length) {
+        issues.push({
+          id: "deploy-diff",
+          label: "No diff has been generated",
+          detail: "Generate a diff so the delta manifest is based on reviewed change scope.",
+          section: "diffSection",
+          cta: "Open diff"
+        });
+      }
+      if (!selectedDiffCount) {
+        issues.push({
+          id: "deploy-selection",
+          label: "No changes are selected for the delta",
+          detail: "Select the changes you want to deploy before building or reviewing the delta manifest.",
+          section: "diffSection",
+          cta: "Review selections"
+        });
+      }
+      if (!deltaManifest.trim()) {
+        issues.push({
+          id: "deploy-manifest",
+          label: "Delta manifest is empty",
+          detail: "Build the delta manifest from the selected changes before deployment.",
+          section: "diffSection",
+          cta: "Build delta"
+        });
+      }
+    } else if (deployType === "manifest") {
+      if (!customManifestXml.trim()) {
+        issues.push({
+          id: "deploy-manifest-empty",
+          label: "Custom manifest is empty",
+          detail: "Please provide a valid package.xml manifest content in the textarea before deploying.",
+          section: "diffSection",
+          cta: "Edit manifest"
+        });
+      }
     }
     return issues;
-  }, [deltaManifest, selectedDiffCount, state.activeProject?.destinationOrg, state.activeProject?.id, state.diffChanges.length]);
+  }, [deltaManifest, selectedDiffCount, state.activeProject?.destinationOrg, state.activeProject?.id, state.diffChanges.length, deployType, customManifestXml]);
   const canRunWorkspaceDiff = compareReadinessIssues.length === 0;
   const canRunOrchestrator = orchestratorReadinessIssues.length === 0;
   const canRunDeployFlow = deployReadinessIssues.length === 0;
@@ -894,6 +967,9 @@ export default function Home() {
           setDiffReportPath(outputs.reportRelPath || "");
           const deltaEl = document.getElementById("deltaManifest") as HTMLTextAreaElement | null;
           if (deltaEl) deltaEl.value = outputs.deltaXml || "";
+          setCompareJobId("");
+          setIncludeDeletions(true);
+          loadDestructivePreview();
         }
         if (status.status === "failed") {
           if (compareTimerRef.current) {
@@ -901,6 +977,7 @@ export default function Home() {
             compareTimerRef.current = null;
           }
           setCurrentProcess("");
+          setCompareJobId("");
           refreshHistory();
         }
       } catch (err: any) {
@@ -964,6 +1041,7 @@ export default function Home() {
         }
         if (status.status === "done" || status.status === "failed") {
           setCurrentProcess("");
+          setDeployJobId("");
           if (deployTimerRef.current) {
             clearInterval(deployTimerRef.current);
             deployTimerRef.current = null;
@@ -1055,6 +1133,36 @@ export default function Home() {
     }
   }
 
+  async function loadFeatureFlags() {
+    try {
+      const data = await api("/api/company-admin/feature-flags");
+      const flags: Record<string, boolean> = {};
+      if (data.features) {
+        data.features.forEach((f: any) => {
+          flags[f.featureKey] = f.enabled;
+        });
+      }
+      setEnabledFeatures(flags);
+    } catch (err) {
+      console.error("Failed to load feature flags:", err);
+    }
+  }
+
+  async function loadInsights() {
+    const data = await api("/api/company-admin/ai-insights");
+    setInsights(data.insights || []);
+  }
+
+  async function loadScans() {
+    const data = await api("/api/company-admin/static-scans");
+    setScans(data.scans || []);
+  }
+
+  async function loadDocs() {
+    const data = await api("/api/company-admin/org-docs");
+    setDocs(data.docs || []);
+  }
+
   async function loadProfile() {
     const data = await api("/api/profile");
     setProfileData({
@@ -1115,7 +1223,7 @@ export default function Home() {
   useEffect(() => {
     const saved = localStorage.getItem("theme");
     const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const next = saved === "dark" || saved === "sand" || saved === "slate" ? saved : prefersDark ? "dark" : "light";
+    const next = saved === "dark" || saved === "mint" || saved === "sand" || saved === "slate" ? saved : prefersDark ? "dark" : "light";
     setTheme(next);
     document.documentElement.dataset.theme = next;
   }, []);
@@ -1137,7 +1245,7 @@ export default function Home() {
     };
   }, []);
 
-  function handleThemeChange(next: "light" | "dark" | "sand" | "slate") {
+  function handleThemeChange(next: "light" | "mint" | "dark" | "sand" | "slate") {
     setTheme(next);
     localStorage.setItem("theme", next);
     document.documentElement.dataset.theme = next;
@@ -1161,6 +1269,7 @@ export default function Home() {
     loadProjects();
     loadOrgs();
     loadUsage();
+    loadFeatureFlags();
   }, [state.token]);
 
   useEffect(() => {
@@ -1182,6 +1291,9 @@ export default function Home() {
     if (state.activeProject) {
       refreshManifests();
       refreshHistory();
+      loadAgentConfig(state.activeProject.id);
+      loadAgentHistory(state.activeProject.id);
+      loadDestructivePreview();
       setDiffReportPath("");
       setReportContent("");
       setReportError("");
@@ -1203,6 +1315,31 @@ export default function Home() {
   useEffect(() => {
     if (isSignedIn && activeSection === "historySection") {
       refreshHistory();
+    }
+  }, [activeSection, state.activeProject?.id, isSignedIn]);
+
+  useEffect(() => {
+    if (isSignedIn && activeSection === "aiInsightsSection") {
+      loadInsights().catch((err: any) => setOutput({ error: err.message }));
+    }
+  }, [activeSection, isSignedIn]);
+
+  useEffect(() => {
+    if (isSignedIn && activeSection === "staticScansSection") {
+      loadScans().catch((err: any) => setOutput({ error: err.message }));
+    }
+  }, [activeSection, isSignedIn]);
+
+  useEffect(() => {
+    if (isSignedIn && activeSection === "orgDocsSection") {
+      loadDocs().catch((err: any) => setOutput({ error: err.message }));
+    }
+  }, [activeSection, isSignedIn]);
+
+  useEffect(() => {
+    if (isSignedIn && activeSection === "agentSection" && state.activeProject?.id) {
+      loadAgentConfig(state.activeProject.id);
+      loadAgentHistory(state.activeProject.id);
     }
   }, [activeSection, state.activeProject?.id, isSignedIn]);
 
@@ -1468,6 +1605,16 @@ export default function Home() {
     }
   }
 
+  async function loadDestructivePreview() {
+    try {
+      if (!state.activeProject) return;
+      const data = await api(`/api/projects/${state.activeProject.id}/destructive`);
+      setDestructivePreview({ count: data?.count || 0, components: Array.isArray(data?.components) ? data.components : [] });
+    } catch {
+      // Non-fatal: leave the previous preview in place if the lookup fails.
+    }
+  }
+
   async function handleSaveManifest(type: "source" | "destination" | "delta") {
     try {
       if (!state.activeProject) return;
@@ -1483,9 +1630,16 @@ export default function Home() {
       if (type === "destination") setDestManifestValue(validated.xml);
       if (type === "delta") setDeltaManifest(validated.xml);
       setOutput(data);
-      if (validated.warnings.length) {
+      const clearedDeletions = Array.isArray(data?.cleared) && data.cleared.includes("destructiveChanges.xml");
+      if (clearedDeletions) {
+        setUiNotice({
+          type: "success",
+          message: "Saved. Pending destructive deletions were cleared — this manifest will deploy additively. Re-run Compare to re-arm deletions.",
+        });
+      } else if (validated.warnings.length) {
         setUiNotice({ type: "success", message: validated.warnings[0] });
       }
+      if (type === "delta") loadDestructivePreview();
     } catch (err: any) {
       setOutput({ error: err.message });
     }
@@ -1706,6 +1860,8 @@ export default function Home() {
         includedCount: data.selectionCount,
         deltaLength: (data.deltaXml || "").length
       });
+      setIncludeDeletions(true);
+      loadDestructivePreview();
     } catch (err: any) {
       setOutput({ error: err.message });
     } finally {
@@ -1774,21 +1930,65 @@ export default function Home() {
     }
   }
 
+  async function triggerOrchestratedDeploy(options: { checkOnly?: boolean; autoRetry?: boolean }) {
+    if (!state.activeProject) return;
+    try {
+      const checkOnly = options.checkOnly ?? false;
+      const autoRetry = options.autoRetry ?? true;
+      setCurrentProcess(checkOnly ? "Validating metadata in Salesforce target org..." : "Deploying metadata to Salesforce target org...");
+      setDeployStatus({
+        status: "running",
+        phase: checkOnly ? "validating" : "staging",
+        progressPercent: 20,
+        summary: checkOnly ? "Running pre-flight dry-run validation..." : "Staging metadata files and delta package..."
+      });
+      const data = await api(`/api/projects/${state.activeProject.id}/deploy`, {
+        method: "POST",
+        body: JSON.stringify({
+          checkOnly,
+          autoRetry,
+          retryLimit: 3,
+          testLevel: "NoTestRun",
+          deployType: "delta"
+        })
+      });
+      setDeployJobId(data.jobId || "");
+      if (data.deployLog) startLogStream(data.deployLog, `deploy-${data.jobId || "active"}`);
+      if (data.jobId) startDeployStatusPoll(data.jobId);
+    } catch (err: any) {
+      setOutput({ error: err.message });
+      setDeployStatus({ status: "failed", error: err.message });
+    }
+  }
+
   async function handleDeploy() {
     try {
       if (!state.activeProject) return;
-      setCurrentProcess("Deploying delta");
+      setCurrentProcess("Deploying...");
       const testLevel = (document.getElementById("testLevel") as HTMLSelectElement).value;
       const runTestsRaw = (document.getElementById("runTests") as HTMLInputElement).value.trim();
       const runTests = runTestsRaw ? runTestsRaw.split(",").map((item) => item.trim()).filter(Boolean) : [];
       const checkOnly = (document.getElementById("checkOnly") as HTMLSelectElement).value === "true";
       const autoRetry = (document.getElementById("autoRetry") as HTMLSelectElement).value === "true";
       const retryLimit = Number((document.getElementById("retryLimit") as HTMLSelectElement).value || "3");
+      // Deletions apply only to delta deploys, and only when explicitly included.
+      // manifest/full deploys are always additive (enforced server-side too).
+      const ignoreDestructive = deployType === "delta" ? !includeDeletions : true;
       const componentsRaw = (document.getElementById("componentOverrides") as HTMLInputElement).value.trim();
       const components = componentsRaw ? componentsRaw.split(",").map((item) => item.trim()).filter(Boolean) : [];
       const data = await api(`/api/projects/${state.activeProject.id}/deploy`, {
         method: "POST",
-        body: JSON.stringify({ testLevel, runTests, checkOnly, autoRetry, retryLimit, components }),
+        body: JSON.stringify({ 
+          testLevel, 
+          runTests, 
+          checkOnly, 
+          autoRetry, 
+          retryLimit, 
+          components, 
+          ignoreDestructive,
+          deployType,
+          manifestContent: customManifestXml
+        }),
       });
       setDeployJobId(data.jobId || "");
       setDeployStatus({ status: "running", startedAt: new Date().toISOString() });
@@ -1819,10 +2019,58 @@ export default function Home() {
     }
   }
 
+  async function loadAgentConfig(projectId: string) {
+    try {
+      setAgentConfigLoading(true);
+      const data = await api(`/api/projects/${projectId}/agents/config`);
+      setAgentConfig(data);
+    } catch (err: any) {
+      console.error("Failed to load agent config:", err);
+    } finally {
+      setAgentConfigLoading(false);
+    }
+  }
+
+  async function loadAgentHistory(projectId: string) {
+    try {
+      const data = await api(`/api/projects/${projectId}/agents/history`);
+      setAgentHistory(data.runs || []);
+    } catch (err: any) {
+      console.error("Failed to load agent history:", err);
+    }
+  }
+
+  async function handleSaveAgentConfig() {
+    if (!state.activeProject) return;
+    try {
+      setAgentConfigLoading(true);
+      const enabled = (document.getElementById("agentEnabled") as HTMLSelectElement).value === "true";
+      const maxRetries = Number((document.getElementById("agentMaxRetries") as HTMLInputElement).value || "3");
+      const geminiApiKey = agentApiKeyInput;
+      
+      const data = await api(`/api/projects/${state.activeProject.id}/agents/config`, {
+        method: "POST",
+        body: JSON.stringify({ enabled, maxRetries, geminiApiKey }),
+      });
+      setAgentConfig(data);
+      setAgentApiKeyInput("");
+      setUiNotice({ type: "success", message: "Autonomous AI Agent settings saved successfully!" });
+      loadAgentHistory(state.activeProject.id);
+    } catch (err: any) {
+      setUiNotice({ type: "error", message: `Failed to save agent config: ${err.message}` });
+    } finally {
+      setAgentConfigLoading(false);
+    }
+  }
+
+  if (!isSignedIn) {
+    return <AuthCard />;
+  }
+
   return (
     <div className="min-h-screen">
 
-      {isSignedIn ? (
+      {isSignedIn && viewMode === "advanced" ? (
       <aside
         className="z-10 w-full overflow-y-auto overscroll-y-contain border-b border-[var(--line)] bg-white/80 p-4 md:fixed md:left-0 md:top-0 md:h-screen md:w-64 md:border-b-0 md:border-r"
       >
@@ -1847,8 +2095,8 @@ export default function Home() {
                         key={item.id}
                         className={`block w-full rounded-2xl border px-3 py-2 text-sm transition ${
                           activeSection === item.id
-                            ? "border-[var(--accent)] bg-white text-[var(--accent-strong)] shadow-sm"
-                            : "border-transparent hover:border-[var(--line)] hover:bg-white"
+                            ? "border-sky-400/80 bg-slate-800 text-sky-400 font-bold shadow-sm ring-1 ring-sky-400/30"
+                            : "border-transparent text-slate-400 hover:text-white hover:bg-slate-900"
                         }`}
                         onClick={() => setActiveSection(item.id)}
                       >
@@ -1883,28 +2131,62 @@ export default function Home() {
       </aside>
       ) : null}
 
-      <div className={isSignedIn ? "md:ml-64" : ""}>
-        <header className="glass sticky top-0 z-20 border-b border-[var(--line)]">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-            <div>
-              <div className="text-lg font-semibold">SFDX DevOps Platform</div>
-              <div className="text-xs uppercase tracking-[0.25em] text-[var(--muted)]">Manifest · Retrieve · Diff · Deploy</div>
-              {appVersion ? (
-                <div className="mt-1 text-[11px] font-medium text-[var(--muted)]">
-                  Running build {appVersion}
+      <div className={isSignedIn && viewMode === "advanced" ? "md:ml-64" : ""}>
+        <header className="glass sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-lg shadow-sky-500/25">
+                <span className="text-lg font-bold">⚡</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-bold tracking-tight text-white">Salesforce DevOps Hub</span>
+                  <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/20">
+                    ENTERPRISE
+                  </span>
+                </div>
+                <div className="text-[11px] font-medium text-slate-400">
+                  Automated Metadata Healing & Multi-Pass Deployment Platform
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {isSignedIn ? (
+                <div className="flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/90 p-1 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("simple")}
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                      viewMode === "simple"
+                        ? "bg-sky-400 text-slate-950 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Simple
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("advanced")}
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                      viewMode === "advanced"
+                        ? "bg-slate-800 text-sky-400 border border-sky-500/50 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Advanced
+                  </button>
                 </div>
               ) : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
+              <ServerVersionBadge />
               <select
                 className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs"
                 value={theme}
-                onChange={(event) => handleThemeChange(event.target.value as "light" | "dark" | "sand" | "slate")}
+                onChange={(event) => handleThemeChange(event.target.value as "light" | "mint" | "dark" | "sand" | "slate")}
               >
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="sand">Sand</option>
-                <option value="slate">Slate</option>
+                <option value="light">⛅ Sky &amp; Slate</option>
+                <option value="mint">🌿 Cloud Mint</option>
+                <option value="dark">🌙 Twilight Dim</option>
               </select>
               <button
                 className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs text-[var(--muted)]"
@@ -1931,6 +2213,13 @@ export default function Home() {
                   Admin
                 </button>
               ) : null}
+              <button
+                className="rounded-full border border-sky-400/50 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+                onClick={() => window.location.assign("/")}
+                title="Open comprehensive SFDX DevOps Hub & Feature Showcase"
+              >
+                🌟 Product Hub
+              </button>
               <button
                 className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
                 onClick={() => window.open("/docs", "_blank")}
@@ -1994,11 +2283,37 @@ export default function Home() {
           {currentProcess ? (
             <div className="border-t border-[var(--line)] bg-[var(--surface)] px-6 py-2 text-xs text-[var(--muted)]">
               Running: {currentProcess}
-              {compareJobId ? ` · Job ${compareJobId.slice(0, 6)}` : ""}
+              {deployJobId ? ` · Job ${deployJobId.slice(0, 6)}` : compareJobId ? ` · Job ${compareJobId.slice(0, 6)}` : ""}
             </div>
           ) : null}
         </header>
-        <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+        <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
+          {isSignedIn ? (
+            <OrchestratorFlow
+              activeProject={state.activeProject}
+              projects={state.projects}
+              orgs={state.orgs}
+              hasSourceRetrieve={hasSourceRetrieve}
+              hasDestinationRetrieve={hasDestinationRetrieve}
+              diffCount={state.diffChanges.length}
+              selectedDiffCount={selectedDiffCount}
+              manifestReady={manifestReady}
+              deltaManifest={deltaManifest}
+              deployStatus={deployStatus}
+              deployJobId={deployJobId}
+              currentProcess={currentProcess}
+              onNavigateSection={(sec) => {
+                setActiveSection(sec);
+                setViewMode("advanced");
+              }}
+              onRetrieve={(target) => handleRetrieve(target)}
+              onCompare={(strategy) => handleCompare((strategy || "auto") as any)}
+              onBuildDelta={handleBuildDeltaFromSelection}
+              onDeploy={(options) => triggerOrchestratedDeploy(options)}
+              viewMode={viewMode}
+              onChangeViewMode={setViewMode}
+            />
+          ) : null}
         {uiNotice ? (
           <section
             className={`rounded-2xl border px-4 py-3 text-sm ${
@@ -2060,87 +2375,6 @@ export default function Home() {
             </div>
           </section>
         ) : null}
-        {!isSignedIn ? (
-          <section id="authSection" className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--ink)] shadow-[var(--card-shadow)]">
-            {authMode === "login" ? (
-              <div className="mx-auto max-w-md space-y-4">
-                <h3 className="text-base font-semibold">Login</h3>
-                <input id="loginEmail" className="w-full rounded-2xl border border-[var(--line)] px-4 py-3" placeholder="Email" />
-                <input id="loginPassword" type="password" className="w-full rounded-2xl border border-[var(--line)] px-4 py-3" placeholder="Password" />
-                <button className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold" onClick={handleLogin}>
-                  Login
-                </button>
-                <button className="text-xs underline" onClick={() => setAuthMode("forgot")}>
-                  Forgot password?
-                </button>
-                {authError ? <div className="text-xs text-rose-600">{authError}</div> : null}
-                <div className="text-xs text-[var(--muted)]">
-                  New here?{" "}
-                  <button className="underline" onClick={() => setAuthMode("register")}>
-                    Create an account
-                  </button>
-                </div>
-              </div>
-            ) : authMode === "register" ? (
-              <div className="mx-auto max-w-md space-y-4">
-                <h3 className="text-base font-semibold">Register</h3>
-                <input id="registerEmail" className="w-full rounded-2xl border border-[var(--line)] px-4 py-3" placeholder="Email" />
-                <input id="registerPassword" type="password" className="w-full rounded-2xl border border-[var(--line)] px-4 py-3" placeholder="Password" />
-                <button className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white" onClick={handleRegister}>
-                  Create account
-                </button>
-                {authError ? <div className="text-xs text-rose-600">{authError}</div> : null}
-                <div className="text-xs text-[var(--muted)]">
-                  Already have an account?{" "}
-                  <button className="underline" onClick={() => setAuthMode("login")}>
-                    Go to login
-                  </button>
-                </div>
-              </div>
-            ) : authMode === "forgot" ? (
-              <div className="mx-auto max-w-md space-y-4">
-                <h3 className="text-base font-semibold">Reset password</h3>
-                <input id="forgotEmail" className="w-full rounded-2xl border border-[var(--line)] px-4 py-3" placeholder="Email" />
-                <button className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold" onClick={handleForgotPassword}>
-                  Send reset link
-                </button>
-                {authError ? <div className="text-xs text-rose-600">{authError}</div> : null}
-                <div className="text-xs text-[var(--muted)]">
-                  Remembered your password?{" "}
-                  <button className="underline" onClick={() => setAuthMode("login")}>
-                    Back to login
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="mx-auto max-w-md space-y-4">
-                <h3 className="text-base font-semibold">Multi-factor verification</h3>
-                <p className="text-sm text-[var(--muted)]">Enter the 6-digit code from your authenticator app to complete sign-in.</p>
-                <input
-                  className="w-full rounded-2xl border border-[var(--line)] px-4 py-3"
-                  placeholder="123456"
-                  value={mfaCode}
-                  onChange={(event) => setMfaCode(event.target.value.replace(/\D+/g, "").slice(0, 6))}
-                />
-                <button className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold" onClick={handleMfaLogin}>
-                  Verify code
-                </button>
-                <button
-                  className="text-xs underline"
-                  onClick={() => {
-                    setAuthMode("login");
-                    setMfaChallengeToken("");
-                    setMfaCode("");
-                  }}
-                >
-                  Back to login
-                </button>
-                {authError ? <div className="text-xs text-rose-600">{authError}</div> : null}
-              </div>
-            )}
-          </section>
-        ) : null}
-
         {isSignedIn && activeSection === "dashboardSection" ? (
         <section id="dashboardSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3586,27 +3820,104 @@ export default function Home() {
         {isSignedIn && activeSection === "deploySection" ? (
         <section id="deploySection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)]">
           <h2 className="text-lg font-semibold">Deploy</h2>
-          <p className="text-sm text-[var(--muted)]">Deploy delta manifest with optional tests and retry.</p>
+          <p className="text-sm text-[var(--muted)]">Deploy metadata to destination Salesforce org using different modes.</p>
           {renderGuide("deploySection")}
           {renderReadinessPanel(
             "Deploy Readiness",
             deployReadinessIssues,
             "Deploy can run. Destination org, reviewed diff, and delta manifest are ready."
           )}
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Delta manifest</h3>
-              <button className="rounded-full border border-[var(--line)] px-3 py-1 text-xs" onClick={() => handleSaveManifest("delta")}>
-                Save delta
-              </button>
-            </div>
-            <textarea
-              id="deltaManifest"
-              className="h-44 w-full rounded-2xl border border-[var(--line)] px-3 py-2 font-mono text-xs"
-              value={deltaManifest}
-              onChange={(event) => setDeltaManifest(event.target.value)}
-            ></textarea>
+          
+          <div className="mt-6">
+            <label className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Deployment Mode</label>
+            <select
+              id="deployModeSelect"
+              className="mt-2 w-full rounded-xl border border-[var(--line)] px-3 py-2 bg-white"
+              value={deployType}
+              onChange={(e) => setDeployType(e.target.value as any)}
+            >
+              <option value="delta">Delta Selection (Only Selected Changes)</option>
+              <option value="full">Full Source (All metadata in force-app)</option>
+              <option value="manifest">Custom Manifest (Provide package.xml)</option>
+            </select>
           </div>
+
+          {deployType === "delta" && (
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Delta manifest</h3>
+                <button className="rounded-full border border-[var(--line)] px-3 py-1 text-xs" onClick={() => handleSaveManifest("delta")}>
+                  Save delta
+                </button>
+              </div>
+              <textarea
+                id="deltaManifest"
+                className="h-44 w-full rounded-2xl border border-[var(--line)] px-3 py-2 font-mono text-xs"
+                value={deltaManifest}
+                onChange={(event) => setDeltaManifest(event.target.value)}
+              ></textarea>
+
+              {destructivePreview.count > 0 && (
+                <div className="rounded-2xl border border-red-300 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+                      ⚠️ This deploy will DELETE {destructivePreview.count} component{destructivePreview.count === 1 ? "" : "s"} from {state.activeProject?.destinationOrg || "the target org"}
+                    </span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs underline text-red-700 dark:text-red-300"
+                      onClick={() => setShowDeletionDetails((v) => !v)}
+                    >
+                      {showDeletionDetails ? "Hide" : "Show"} list
+                    </button>
+                  </div>
+                  {showDeletionDetails && (
+                    <ul className="mt-2 max-h-40 overflow-auto font-mono text-xs text-red-800 dark:text-red-300/90">
+                      {destructivePreview.components.flatMap((component) =>
+                        component.members.map((member) => (
+                          <li key={`${component.name}:${member}`}>{component.name}: {member}</li>
+                        ))
+                      )}
+                    </ul>
+                  )}
+                  <label className="mt-3 flex items-center gap-2 text-xs font-medium text-red-800 dark:text-red-300">
+                    <input
+                      type="checkbox"
+                      checked={includeDeletions}
+                      onChange={(event) => setIncludeDeletions(event.target.checked)}
+                    />
+                    Include these deletions in the deploy (uncheck to deploy additively)
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {deployType === "full" && (
+            <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-200">
+              <h3 className="font-semibold text-blue-800 dark:text-blue-300">Full Source Mode Active</h3>
+              <p className="mt-1 text-xs text-blue-700/80 dark:text-blue-400/80">
+                This mode deploys all metadata files from the source project&apos;s <code>force-app</code> directory directly.
+                Any local adjustments or uncommitted files in the workspace will be bundled and deployed to the destination org.
+              </p>
+            </div>
+          )}
+
+          {deployType === "manifest" && (
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Custom Manifest (package.xml)</h3>
+              </div>
+              <textarea
+                id="customManifestXml"
+                placeholder={`<?xml version="1.0" encoding="UTF-8"?>\n<Package xmlns="http://soap.sforce.com/2006/04/metadata">\n    <types>\n        <members>MyApexClass</members>\n        <name>ApexClass</name>\n    </types>\n    <version>66.0</version>\n</Package>`}
+                className="h-64 w-full rounded-2xl border border-[var(--line)] px-3 py-2 font-mono text-xs"
+                value={customManifestXml}
+                onChange={(event) => setCustomManifestXml(event.target.value)}
+              ></textarea>
+            </div>
+          )}
+
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             <div>
               <label className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Test level</label>
@@ -3660,7 +3971,7 @@ export default function Home() {
               onClick={handleDeploy}
               disabled={!canRunDeployFlow}
             >
-              Deploy delta
+              {deployType === "delta" ? "Deploy delta" : deployType === "full" ? "Deploy Full Source" : "Deploy Custom Manifest"}
             </button>
             <button
               className={`rounded-full px-4 py-2 text-xs ${
@@ -3761,6 +4072,334 @@ export default function Home() {
                 <div className="mt-3 text-sm text-[var(--muted)]">No comparison jobs yet.</div>
               )}
             </div>
+          </div>
+        </section>
+        ) : null}
+
+        {isSignedIn && activeSection === "aiInsightsSection" ? (
+        <section id="aiInsightsSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">AI Deployment Insights</h2>
+              <p className="text-sm text-[var(--muted)]">Autogenerated recommendations for failed jobs.</p>
+            </div>
+            <button className="rounded-full border border-[var(--line)] px-3 py-2 text-xs" onClick={() => loadInsights().catch((err: any) => setOutput({ error: err.message }))}>
+              Refresh insights
+            </button>
+          </div>
+          <div className="mt-6 space-y-3">
+            {insights.length ? (
+              insights.map((insight) => (
+                <div key={insight.id} className="rounded-2xl border border-[var(--line)] bg-white p-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">{insight.summary}</span>
+                    <span
+                      className={`text-[10px] uppercase ${
+                        insight.severity === "error"
+                          ? "text-rose-600"
+                          : insight.severity === "warning"
+                          ? "text-orange-600"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      {insight.severity || "info"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[var(--muted)]">{insight.recommendation}</p>
+                  {insight.rawError ? (
+                    <details className="mt-2 text-[var(--muted)]">
+                      <summary className="cursor-pointer text-[10px]">Show raw error</summary>
+                      <pre className="mt-1 whitespace-pre-wrap text-[10px]">{insight.rawError}</pre>
+                    </details>
+                  ) : null}
+                  <div className="mt-2 text-[10px] text-[var(--muted)]">
+                    Job: {insight.jobId || "n/a"} • Generated {new Date(insight.createdAt).toLocaleString()}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-[var(--muted)] text-sm">No AI insights available yet. Run failing jobs and rerun the generator via `npm run ai:insights`.</div>
+            )}
+          </div>
+        </section>
+        ) : null}
+
+        {isSignedIn && activeSection === "staticScansSection" ? (
+        <section id="staticScansSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Static Scan Reports</h2>
+              <p className="text-sm text-[var(--muted)]">Automated code hygiene and quality reports ({scans.length} stored).</p>
+            </div>
+            <button className="rounded-full border border-[var(--line)] px-3 py-2 text-xs" onClick={() => loadScans().catch((err: any) => setOutput({ error: err.message }))}>
+              Refresh scans
+            </button>
+          </div>
+          <div className="mt-6 space-y-3">
+            {scans.length ? (
+              scans.map((scan) => (
+                <div key={scan.id} className="rounded-2xl border border-[var(--line)] bg-white p-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Scan {scan.id}</span>
+                    <span className="text-[10px] uppercase text-slate-500">{scan.status}</span>
+                  </div>
+                  <p className="mt-2 text-[var(--muted)]">{scan.summary}</p>
+                  {scan.reportPath ? (
+                    <div className="mt-2 text-[10px] text-[var(--muted)]">Report: {scan.reportPath}</div>
+                  ) : null}
+                  <div className="mt-2 text-[10px] text-[var(--muted)]">
+                    Generated {new Date(scan.createdAt).toLocaleString()}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-[var(--muted)] text-sm">No scans have been executed yet. Run `npm run scan:static` to generate a fresh report.</div>
+            )}
+          </div>
+        </section>
+        ) : null}
+
+        {isSignedIn && activeSection === "orgDocsSection" ? (
+        <section id="orgDocsSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Org Design Documents</h2>
+              <p className="text-sm text-[var(--muted)]">AI-generated architecture briefs.</p>
+            </div>
+            <button className="rounded-full border border-[var(--line)] px-3 py-2 text-xs" onClick={() => loadDocs().catch((err: any) => setOutput({ error: err.message }))}>
+              Refresh documents
+            </button>
+          </div>
+          <div className="mt-6 space-y-3">
+            {docs.length ? (
+              docs.map((doc) => (
+                <div key={doc.id} className="rounded-2xl border border-[var(--line)] bg-white p-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{doc.id}</span>
+                    <span className="text-[10px] text-[var(--muted)]">{new Date(doc.createdAt).toLocaleString()}</span>
+                  </div>
+                  <p className="mt-2 text-[var(--muted)]">{doc.summary || "Generated org overview document."}</p>
+                  <div className="mt-2 text-[10px] text-[var(--muted)]">Path: {doc.docPath}</div>
+                </div>
+              ))
+            ) : (
+              <div className="text-[var(--muted)] text-sm">No documents yet. Regenerate with `npm run doc:org`.</div>
+            )}
+          </div>
+        </section>
+        ) : null}
+
+        {isSignedIn && activeSection === "agentSection" ? (
+        <section id="agentSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Autonomous AI Agent</h2>
+              <p className="text-sm text-[var(--muted)]">Configure the AI self-healing agent and review deployment healing history.</p>
+            </div>
+            <button 
+              className="rounded-full border border-[var(--line)] px-3 py-2 text-xs" 
+              onClick={() => {
+                if (state.activeProject?.id) {
+                  loadAgentConfig(state.activeProject.id);
+                  loadAgentHistory(state.activeProject.id);
+                }
+              }}
+            >
+              Refresh Details
+            </button>
+          </div>
+
+          {renderGuide("agentSection")}
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            {/* Settings Card */}
+            <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6">
+              <h3 className="text-sm font-semibold tracking-wide uppercase text-[var(--muted)] mb-4">Agent Configuration</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2">Auto-healing Status</label>
+                  <select 
+                    id="agentEnabled" 
+                    className="w-full rounded-xl border border-[var(--line)] px-3 py-2 text-sm bg-white"
+                    value={agentConfig?.enabled ? "true" : "false"}
+                    onChange={(e) => {
+                      const val = e.target.value === "true";
+                      setAgentConfig(prev => prev ? { ...prev, enabled: val } : { enabled: val, maxRetries: 3, hasApiKey: false, hasGlobalApiKey: false });
+                    }}
+                  >
+                    <option value="true">Enabled (Auto-heals failed deployments)</option>
+                    <option value="false">Disabled (Manual healing runs only)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2">Max Retry Attempts ({agentConfig?.maxRetries ?? 3})</label>
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="range" 
+                      id="agentMaxRetries" 
+                      min="1" 
+                      max="5" 
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[var(--line)] accent-[var(--accent)]"
+                      value={agentConfig?.maxRetries ?? 3}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setAgentConfig(prev => prev ? { ...prev, maxRetries: val } : { enabled: false, maxRetries: val, hasApiKey: false, hasGlobalApiKey: false });
+                      }}
+                    />
+                    <span className="text-sm font-mono">{agentConfig?.maxRetries ?? 3}</span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-[var(--muted)]">Attempts the agent will make to heal and redeploy before giving up.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2">
+                    Gemini API Key 
+                    {agentConfig?.hasApiKey && <span className="ml-2 inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Saved</span>}
+                    {agentConfig?.hasGlobalApiKey && <span className="ml-2 inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">Global Fallback Configured</span>}
+                  </label>
+                  <input 
+                    type="password"
+                    placeholder={agentConfig?.hasApiKey ? "••••••••••••••••" : "Enter project-specific Gemini API Key"}
+                    className="w-full rounded-xl border border-[var(--line)] px-3 py-2 text-sm bg-white font-mono"
+                    value={agentApiKeyInput}
+                    onChange={(e) => setAgentApiKeyInput(e.target.value)}
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--muted)]">
+                    Stored encrypted. Leave blank to retain existing key, or to fallback to the global environment API key.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    className="w-full rounded-full bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white px-4 py-2 text-xs font-semibold transition flex items-center justify-center gap-2"
+                    disabled={agentConfigLoading || !state.activeProject}
+                    onClick={handleSaveAgentConfig}
+                  >
+                    {agentConfigLoading ? "Saving..." : "Save Settings"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Overview / Usage Stats Card */}
+            <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 flex flex-col justify-between">
+              <div>
+                <h3 className="text-sm font-semibold tracking-wide uppercase text-[var(--muted)] mb-4">Self-Healing Overview</h3>
+                <div className="space-y-3 text-xs text-[var(--muted)]">
+                  <p>
+                    When auto-healing is <strong className="text-[var(--ink)]">Enabled</strong>, the toolkit intercepts failed deployment jobs and activates the Autonomous AI Agent.
+                  </p>
+                  <p>
+                    The agent analyzes the deployment log output to classify the exact failure reason (e.g. invalid permissions, missing profile tags, outdated API versions), dynamically extracts the source code, runs automated XML and LLM healers to auto-repair issues, and initiates a retry deployment cycle.
+                  </p>
+                  <div className="rounded-xl border border-sky-100 bg-sky-50/50 p-3 text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/20">
+                    <span className="font-semibold text-xs block mb-1">Cost Alert</span>
+                    Each auto-healing run costs <strong className="font-mono text-sky-700 dark:text-sky-400">$0.50</strong> against your tenant allowance. Failed healing retries are not double-billed within the same job cycle.
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-[var(--line)] flex justify-between text-xs">
+                <div>
+                  <span className="text-[var(--muted)]">Total Heals Executed</span>
+                  <span className="block mt-1 text-lg font-bold text-[var(--ink)]">{agentHistory.length}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--muted)]">Success Rate</span>
+                  <span className="block mt-1 text-lg font-bold text-emerald-600">
+                    {agentHistory.length > 0 
+                      ? `${Math.round((agentHistory.filter(h => h.status === 'healed').length / agentHistory.length) * 100)}%`
+                      : "0%"
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Audit Logs Table */}
+          <div className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-3">AI Agent Audit & Logs</div>
+            {agentHistory.length ? (
+              <div className="overflow-auto rounded-xl border border-[var(--line)]">
+                <table className="min-w-[840px] text-sm">
+                  <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
+                    <tr>
+                      <th className="px-4 py-3">Date / Time</th>
+                      <th className="px-4 py-3">Jobs</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Diagnostic Summary</th>
+                      <th className="px-4 py-3">Healers & Modifications</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agentHistory.map((run) => (
+                      <tr key={run.id} className="border-t hover:bg-slate-50/40">
+                        <td className="px-4 py-3 text-xs whitespace-nowrap">
+                          {new Date(run.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <div>
+                            <span className="text-[var(--muted)]">Source:</span> <code className="bg-slate-100 px-1 py-0.5 rounded text-[11px]">#{run.jobId.slice(0, 8)}</code>
+                          </div>
+                          {run.retryJobId && (
+                            <div className="mt-1">
+                              <span className="text-[var(--muted)]">Retry:</span> <code className="bg-slate-100 px-1 py-0.5 rounded text-[11px]">#{run.retryJobId.slice(0, 8)}</code>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs whitespace-nowrap">
+                          {run.status === 'healed' ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                              Healed & Deployed
+                            </span>
+                          ) : run.status === 'failed' ? (
+                            <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/10">
+                              Healing Failed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20 animate-pulse">
+                              In Progress
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs max-w-xs break-words">
+                          {run.diagnosticSummary || <span className="text-[var(--muted)] font-italic">No failure diagnosis recorded.</span>}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {run.healersApplied && run.healersApplied.length > 0 ? (
+                            <div className="mb-2">
+                              <span className="font-semibold text-[10px] text-[var(--muted)] uppercase tracking-wide">Applied:</span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {run.healersApplied.map((h: string, idx: number) => (
+                                  <span key={idx} className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-800">{h}</span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          {run.filesModified && run.filesModified.length > 0 ? (
+                            <div>
+                              <span className="font-semibold text-[10px] text-[var(--muted)] uppercase tracking-wide">Modified:</span>
+                              <div className="mt-1 space-y-1">
+                                {run.filesModified.map((f: string, idx: number) => (
+                                  <div key={idx} className="font-mono text-[10px] truncate max-w-xs" title={f}>
+                                    {f.split('/').pop()}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            !(run.healersApplied && run.healersApplied.length > 0) && <span className="text-[var(--muted)]">None</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-[var(--muted)] text-sm py-4 text-center">No agent healing execution logs yet. Failed deployments with active AI healing will audit here.</div>
+            )}
           </div>
         </section>
         ) : null}

@@ -51,7 +51,7 @@ test('filterUnsupportedMetadataTypes keeps decomposed child metadata when parent
   assert.deepEqual(result.skippedTypes, ['UnknownType']);
 });
 
-test('ensureSfdxProject normalizes legacy force-app package directories to the project root', () => {
+test('ensureSfdxProject normalizes package directories to force-app', () => {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sfdx-project-'));
   const projectFile = path.join(rootDir, 'sfdx-project.json');
 
@@ -59,7 +59,7 @@ test('ensureSfdxProject normalizes legacy force-app package directories to the p
     projectFile,
     JSON.stringify(
       {
-        packageDirectories: [{ path: 'force-app', default: true }],
+        packageDirectories: [{ path: '.', default: true }],
         sourceApiVersion: '65.0'
       },
       null,
@@ -71,7 +71,7 @@ test('ensureSfdxProject normalizes legacy force-app package directories to the p
   ensureSfdxProject(rootDir, '66.0');
 
   const project = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-  assert.deepEqual(project.packageDirectories, [{ path: '.', default: true }]);
+  assert.deepEqual(project.packageDirectories, [{ path: 'force-app', default: true }]);
   assert.equal(project.sourceApiVersion, '66.0');
 });
 

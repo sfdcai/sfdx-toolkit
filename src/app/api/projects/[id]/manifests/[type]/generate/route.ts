@@ -5,6 +5,7 @@ import { getAuthUser } from '@/lib/api';
 import { getProject } from '@/lib/store';
 import { projectPaths, resolveUserPath } from '@/lib/path';
 import { ensureSfdxProject, generateManifestFromOrg } from '@/lib/metadata';
+import { filterManifestXmlByRegistry } from '@/lib/manifest-filter';
 
 export async function POST(req: Request, { params }: { params: { id: string; type: string } }) {
   const user = getAuthUser(req as any);
@@ -24,17 +25,27 @@ export async function POST(req: Request, { params }: { params: { id: string; typ
   const projectRoot = params.type === 'source' ? paths.source : paths.destination;
   ensureSfdxProject(projectRoot, info.apiVersion);
   const logPath = resolveUserPath(user.id, 'projects', project.name, 'deploy', 'logs', `manifest-${params.type}.log`);
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
   try {
     const result = generateManifestFromOrg(manifestPath, orgAlias, info.apiVersion, projectRoot);
+    // Filter unsupported metadata types and normalize members in the generated manifest
+    const filtered = await filterManifestXmlByRegistry(result.xml);
+    const xml = filtered.xml;
+
+    fs.writeFileSync(manifestPath, xml, 'utf8');
     fs.writeFileSync(logPath, `COMMAND: ${result.command}\nOUTPUT: ${JSON.stringify(result.output, null, 2)}\n`, 'utf8');
     return NextResponse.json({
       message: 'Manifest generated',
       manifestPath,
-      xml: result.xml,
+      xml,
       orgAlias,
       apiVersion: info.apiVersion || null,
-      logPath: path.relative(paths.root, logPath)
+      logPath: path.relative(paths.root, logPath),
+      skippedTypes: filtered.skippedTypes,
+      warnings: filtered.warnings,
+      registryPath: filtered.registryPath
     });
+
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Manifest generation failed';
     fs.writeFileSync(logPath, `ERROR: ${message}\n`, 'utf8');

@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
-const base = process.env.APP_BASE_URL || 'http://127.0.0.1:3001';
+const base = process.env.APP_BASE_URL || 'http://127.0.0.1:3000';
 const db = new Database('data/app.db');
 const secret = process.env.JWT_SECRET || 'dev-secret-key-change-me';
 const authUrl = fs
@@ -224,7 +224,7 @@ async function run() {
   let sourceLogPath = null;
   let upgradeRequestId = null;
 
-  let response = await request('GET', '/api/services/status');
+  let response = await request('GET', '/api/services/status', { token: superToken });
   assertStatus(response, 200, 'services.status');
   log('services.status', true, { sf: response.data.sf?.status });
 

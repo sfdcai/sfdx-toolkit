@@ -1,13 +1,21 @@
 {
   "name": "sfdx-toolkit-0.0.1",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "engines": {
+    "node": ">=18.18 <21"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "pm2:start": "node scripts/pm2-start.cjs",
-    "lint": "eslint",
+    "pm2:restart": "pm2 restart sfdx-devops --update-env",
+    "deploy": "npm run predeploy && next build && pm2 restart sfdx-devops --update-env",
+    "lint": "next lint",
+    "test": "tsc -p tsconfig.lib-tests.json && node --test /tmp/sfdx-lib-tests",
+    "test:e2e": "node scripts/validate-e2e.cjs",
+    "test:metadata-map": "node scripts/metadata-map-regression.cjs",
     "migrate:json-db": "node scripts/migrate-json-to-db.cjs",
     "integrity:check": "node scripts/integrity-check.cjs",
     "integrity:fix": "node scripts/integrity-check.cjs --fix",
@@ -17,7 +25,9 @@
     "sf:update:check": "node scripts/check-sf-cli-update.cjs --check-only",
     "sf:update:run": "node scripts/check-sf-cli-update.cjs",
     "sf:update:install-service": "node scripts/install-sf-cli-update-service.cjs",
-    "mcp:start": "node mcp-server/server.mjs"
+    "mcp:start": "node mcp-server/server.mjs",
+    "test:pipeline": "node scripts/pipeline-test.cjs",
+    "predeploy": "node scripts/pipeline-test.cjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

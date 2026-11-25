@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 
-export type FeatureKey = "ai_insights" | "static_scans" | "org_design_docs";
+export type FeatureKey = "ai_insights" | "static_scans" | "org_design_docs" | "autonomous_healing";
 
 export type FeatureDefinition = {
   key: FeatureKey;
@@ -31,6 +31,13 @@ export const featureDefinitions: Record<FeatureKey, FeatureDefinition> = {
     description: "Generate an AI-curated org/project design document so devs can skip manual write-ups.",
     costPerUnit: 0.2,
     unitName: "document"
+  },
+  autonomous_healing: {
+    key: "autonomous_healing",
+    label: "Autonomous AI Self-Healing",
+    description: "Automatically run diagnostics, repair metadata, and self-heal deployment blocks.",
+    costPerUnit: 0.5,
+    unitName: "auto-heal intervention"
   }
 };
 

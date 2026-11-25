@@ -31,11 +31,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const reportRelPath = path.relative(paths.root, reportPath);
   const deltaManifest = paths.manifests.delta;
   const destructiveManifest = path.join(paths.deploy, 'manifest', 'destructiveChanges.xml');
-  const deltaXmlRaw = generateDeltaManifest(deltaManifest, changes);
-  const filteredDelta = filterManifestXmlByRegistry(deltaXmlRaw);
+  const deltaXmlRaw = generateDeltaManifest(deltaManifest, changes, paths.source);
+  const filteredDelta = await filterManifestXmlByRegistry(deltaXmlRaw);
   const deltaXml = filteredDelta.xml;
   fs.writeFileSync(deltaManifest, deltaXml, 'utf8');
-  const destructiveXml = generateDestructiveChanges(destructiveManifest, changes);
+  
+  const destructiveXmlRaw = generateDestructiveChanges(destructiveManifest, changes);
+  let destructiveXml = destructiveXmlRaw;
+  if (destructiveXmlRaw) {
+    const filteredDestructive = await filterManifestXmlByRegistry(destructiveXmlRaw);
+    destructiveXml = filteredDestructive.xml;
+    filteredDestructive.skippedTypes.forEach((t) => {
+      if (!filteredDelta.skippedTypes.includes(t)) filteredDelta.skippedTypes.push(t);
+    });
+    fs.writeFileSync(destructiveManifest, destructiveXml, 'utf8');
+  }
+
   const deltaSnapshot = path.join(jobDir, 'delta-package.xml');
   const destructiveSnapshot = path.join(jobDir, 'destructiveChanges.xml');
   fs.writeFileSync(deltaSnapshot, deltaXml, 'utf8');
@@ -67,9 +78,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     deltaXml,
     destructiveXml,
     skippedUnsupportedTypes: filteredDelta.skippedTypes,
+    warnings: filteredDelta.warnings,
     registryPath: filteredDelta.registryPath,
     changes,
     jobId,
     record
   });
+
 }

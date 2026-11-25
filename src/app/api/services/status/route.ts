@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { dbStats } from '@/lib/db';
 import { getAppVersionInfo } from '@/lib/app-version';
 import { getSfCommand, getSfEnv } from '@/lib/sf';
+import { getAuthUser } from '@/lib/api';
 
 const SF_CACHE_TTL_MS = 60000;
 let sfCache: { ts: number; value: { status: string; details: string; path?: string } } | null = null;
@@ -29,9 +30,16 @@ function sfSnapshot() {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const user = getAuthUser(req as any);
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  const isSuperAdmin = user.role === 'super_admin';
+
   const stats = loadStats();
   const app = getAppVersionInfo();
+  const sf = sfSnapshot();
+  // The resolved CLI filesystem path is infrastructure detail — super_admin only.
+  const sfPayload = isSuperAdmin ? sf : { status: sf.status, details: sf.details };
   return NextResponse.json({
     app: {
       status: 'running',
@@ -43,9 +51,11 @@ export async function GET() {
     },
     database: {
       status: 'connected',
-      details: `${stats.users} users, ${stats.projects} projects, ${stats.orgs} orgs`
+      details: isSuperAdmin
+        ? `${stats.users} users, ${stats.projects} projects, ${stats.orgs} orgs`
+        : 'connected'
     },
     sandbox: { status: 'locked', details: 'User home isolation enforced' },
-    sf: sfSnapshot()
+    sf: sfPayload
   });
 }

@@ -5,9 +5,6 @@ import { listTenantFeatures, setFeatureFlag, FeatureKey } from "@/lib/feature-fl
 export async function GET(req: Request) {
   const user = getAuthUser(req as any);
   if (!user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  if (!["company_admin", "super_admin"].includes(user.role)) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  }
   const features = listTenantFeatures(user.tenantId);
   return NextResponse.json({ features });
 }

@@ -319,6 +319,19 @@ function migrate(db: Database.Database) {
       summary TEXT,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      diagnostic_summary TEXT,
+      healers_applied TEXT,
+      files_modified TEXT,
+      retry_job_id TEXT,
+      created_at TEXT NOT NULL,
+      completed_at TEXT
+    );
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token_hash)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id)');
@@ -326,6 +339,8 @@ function migrate(db: Database.Database) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_ai_insights_tenant ON ai_insights(tenant_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_static_scans_tenant ON static_scans(tenant_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_org_design_docs_tenant ON org_design_docs(tenant_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_agent_runs_project ON agent_runs(project_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_agent_runs_job ON agent_runs(job_id)');
 
   ensureColumn(db, 'users', 'tenant_id', 'TEXT');
   ensureColumn(db, 'users', 'name', 'TEXT');

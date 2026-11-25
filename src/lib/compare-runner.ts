@@ -197,9 +197,8 @@ export async function runCompareJob(job: JobRecord) {
       const recent = listComparisons(job.userId, project.id)[0];
       const changes = Array.isArray(recent?.changes) ? recent.changes : [];
       if (changes.length) {
-        const tempPath = path.join(jobDir, 'delta-manifest.xml');
-        const deltaXmlRaw = generateDeltaManifest(tempPath, changes as any[]);
-        const filteredDelta = filterManifestXmlByRegistry(deltaXmlRaw || '');
+        const deltaXmlRaw = generateDeltaManifest(paths.manifests.delta, changes as any[], paths.source);
+        const filteredDelta = await filterManifestXmlByRegistry(deltaXmlRaw || '');
         sourceManifestXml = filteredDelta.xml || '';
         destManifestXml = filteredDelta.xml || '';
       }
@@ -247,6 +246,23 @@ export async function runCompareJob(job: JobRecord) {
     fs.mkdirSync(path.dirname(paths.manifests.destination), { recursive: true });
     fs.writeFileSync(paths.manifests.source, sourceManifestXml, 'utf8');
     fs.writeFileSync(paths.manifests.destination, destManifestXml, 'utf8');
+
+    // Filter source and destination manifests against the SF CLI registry
+    // to remove types that would cause "Missing metadata type definition" errors during retrieve
+    const filteredSource = await filterManifestXmlByRegistry(sourceManifestXml);
+    const filteredDest = await filterManifestXmlByRegistry(destManifestXml);
+
+    if (filteredSource.skippedTypes.length) {
+      appendJobLog(jobLogPath, `Filtered unsupported types from source manifest: ${filteredSource.skippedTypes.join(', ')}`);
+      sourceManifestXml = filteredSource.xml;
+      fs.writeFileSync(paths.manifests.source, sourceManifestXml, 'utf8');
+    }
+    if (filteredDest.skippedTypes.length) {
+      appendJobLog(jobLogPath, `Filtered unsupported types from destination manifest: ${filteredDest.skippedTypes.join(', ')}`);
+      destManifestXml = filteredDest.xml;
+      fs.writeFileSync(paths.manifests.destination, destManifestXml, 'utf8');
+    }
+
     updateStage('manifest_strategy', 'done');
 
     updateStage('retrieve_source', 'running');
@@ -330,11 +346,21 @@ export async function runCompareJob(job: JobRecord) {
       destinationOrg: project.destinationOrg,
       changes
     });
-    const deltaXmlRaw = generateDeltaManifest(deltaSnapshot, changes);
-    const filteredDelta = filterManifestXmlByRegistry(deltaXmlRaw);
+    const deltaXmlRaw = generateDeltaManifest(deltaSnapshot, changes, paths.source);
+    const filteredDelta = await filterManifestXmlByRegistry(deltaXmlRaw);
     const deltaXml = filteredDelta.xml;
     fs.writeFileSync(deltaSnapshot, deltaXml, 'utf8');
-    const destructiveXml = generateDestructiveChanges(destructiveSnapshot, changes);
+    // Also sync to the project-level delta manifest path so it's ready for deployment
+    fs.mkdirSync(path.dirname(paths.manifests.delta), { recursive: true });
+    fs.writeFileSync(paths.manifests.delta, deltaXml, 'utf8');
+    const destructiveXmlRaw = generateDestructiveChanges(destructiveSnapshot, changes);
+    let destructiveXml = destructiveXmlRaw;
+    if (destructiveXmlRaw) {
+      const filteredDestructive = await filterManifestXmlByRegistry(destructiveXmlRaw);
+      destructiveXml = filteredDestructive.xml;
+      fs.writeFileSync(destructiveSnapshot, destructiveXml, 'utf8');
+    }
+
     updateStage('analyze', 'done');
     updateStage('report', 'running');
     updateStage('report', 'done');
@@ -347,7 +373,21 @@ export async function runCompareJob(job: JobRecord) {
       reportRelPath,
       deltaXml,
       destructiveXml,
-      skippedUnsupportedTypes: filteredDelta.skippedTypes,
+      skippedUnsupportedTypes: [
+        ...new Set([
+          ...filteredSource.skippedTypes,
+          ...filteredDest.skippedTypes,
+          ...filteredDelta.skippedTypes
+        ])
+      ],
+      warnings: [
+        ...new Set([
+          ...filteredSource.warnings,
+          ...filteredDest.warnings,
+          ...filteredDelta.warnings
+        ])
+      ],
+
       changesCount: changes.length,
       changes
     };

@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from "crypto";
 import { NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/api';
-import { getProject, saveComparison } from '@/lib/store';
+import { getProject, saveComparison, enqueueJob, updateJob } from '@/lib/store';
 import { projectPaths, resolveUserPath } from '@/lib/path';
 import { runCompareJob, CompareJobPayload, ManifestScope } from '@/lib/compare-runner';
 
@@ -85,18 +85,26 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       scope: body.scope,
       context: body.context
     };
-    const jobRecord = {
+    const now = new Date().toISOString();
+    const jobRecord = enqueueJob({
       id: jobId,
       tenantId: project.tenantId,
       userId: user.id,
       projectId: project.id,
       type: 'compare',
-      status: 'running' as const,
+      status: 'running',
       payload,
-      attempts: 0,
-      createdAt: new Date().toISOString()
-    };
-    void runCompareJob(jobRecord);
+      startedAt: now,
+      updatedAt: now
+    });
+    void runCompareJob(jobRecord)
+      .then(() => {
+        updateJob(jobId, { status: 'done', completedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        updateJob(jobId, { status: 'failed', error: message, completedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      });
 
     return NextResponse.json({
       message: 'Comparison job queued',

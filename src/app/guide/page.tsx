@@ -37,6 +37,7 @@ export default function GuidePage() {
           <div className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">Guide</div>
           <div className="text-lg font-semibold text-[var(--ink)]">User Guide</div>
           <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <button className="rounded-full border border-sky-400/50 bg-sky-50 px-3 py-1 font-semibold text-sky-700 hover:bg-sky-100" onClick={() => window.location.assign("/")}>🌟 Product Hub</button>
             <button className="rounded-full border border-[var(--line)] bg-white px-3 py-1" onClick={() => window.location.assign("/docs")}>
               Public Docs
             </button>

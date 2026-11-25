@@ -5,7 +5,7 @@ import { userRoot } from './config';
 export function resolveUserPath(userId: string, ...segments: string[]) {
   const base = path.resolve(path.join(userRoot, userId));
   const target = path.resolve(path.join(base, ...segments));
-  if (!target.startsWith(base)) {
+  if (target !== base && !target.startsWith(base + path.sep)) {
     throw new Error('Path escapes user sandbox');
   }
   return target;
