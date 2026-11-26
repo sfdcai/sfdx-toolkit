@@ -6,6 +6,9 @@ import { OrchestratorFlow } from "@/components/orchestrator-flow";
 import { OneClickSyncPanel } from "@/components/views/one-click-sync-panel";
 import { ParityPanel } from "@/components/views/parity-panel";
 import { GitDiffPanel } from "@/components/views/git-diff-panel";
+import { PermissionMatrixPanel } from "@/components/views/permission-matrix-panel";
+import { CommandPalette, CommandAction } from "@/components/command-palette";
+import { FloatingJobDock } from "@/components/floating-job-dock";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { translateError } from "@/lib/error-help";
@@ -62,6 +65,17 @@ const sectionGuides: Record<string, SectionGuide> = {
       "Identify drift before running synchronization."
     ],
     success: "Complete visibility into cross-org parity and readiness."
+  },
+  matrixSection: {
+    eyebrow: "Permissions",
+    title: "Visual Profile & FLS Parity Matrix",
+    summary: "Side-by-side matrix comparing Field-Level Security, Apex Class accesses, and Tab Visibilities with one-click parity healing.",
+    steps: [
+      "Select target Profile (e.g. System Administrator).",
+      "Inspect Read/Edit permissions across Case, Account, User fields.",
+      "Click 'Auto-Heal Permission Drift' to generate and deploy parity package."
+    ],
+    success: "Profiles and Permission Sets are in 100% parity without manual XML editing."
   },
   gitDiffSection: {
     eyebrow: "Git Diff",
@@ -332,6 +346,7 @@ export default function Home() {
     cliConsoleSection: false
   });
   const [checklistCollapsed, setChecklistCollapsed] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [enabledFeatures, setEnabledFeatures] = useState<Record<string, boolean>>({});
   const [insights, setInsights] = useState<any[]>([]);
   const [scans, setScans] = useState<any[]>([]);
@@ -374,34 +389,40 @@ export default function Home() {
     () => {
       const groups = [
         {
-          id: "syncGroup",
-          label: "⚡ One-Click Sync",
-          items: [
-            { id: "syncSection", label: "⚡ One-Click Sync", badge: currentProcess.includes("sync") },
-            { id: "paritySection", label: "🔍 Parity Scanner" },
-            { id: "gitDiffSection", label: "🌲 Git Delta Diff" }
-          ]
-        },
-        {
-          id: "workflow",
-          label: "Workflow",
+          id: "stage1",
+          label: "1. Workspace & Orgs",
           items: [
             { id: "dashboardSection", label: "Dashboard" },
-            { id: "projectSection", label: "Project & Orgs" },
-            { id: "manifestSection", label: "Manifests" },
-            { id: "retrieveSection", label: "Retrieve" },
-            { id: "orchestratorSection", label: "Orchestrator", badge: jobRunning }
+            { id: "projectSection", label: "Projects & Orgs" },
           ]
         },
         {
-          id: "insights",
-          label: "Insights & Deploy",
+          id: "stage2",
+          label: "2. Metadata & Manifest",
           items: [
-            { id: "diffSection", label: "Diff" },
-            { id: "reportSection", label: "Reports" },
+            { id: "manifestSection", label: "Manifests" },
+            { id: "retrieveSection", label: "Retrieve Engine" },
+          ]
+        },
+        {
+          id: "stage3",
+          label: "3. Parity & Diff",
+          items: [
+            { id: "syncSection", label: "⚡ One-Click Sync", badge: currentProcess.includes("sync") },
+            { id: "matrixSection", label: "🔍 FLS & Profile Matrix" },
+            { id: "diffSection", label: "Diff & Delta Selection" },
+            { id: "gitDiffSection", label: "🌲 Git Delta Viewer" },
+            { id: "reportSection", label: "Comparison Reports" },
+          ]
+        },
+        {
+          id: "stage4",
+          label: "4. Release & Deploy",
+          items: [
+            { id: "orchestratorSection", label: "Orchestrator Flow" },
             { id: "jobSection", label: "Job Activity", badge: jobRunning },
-            { id: "deploySection", label: "Deploy" },
-            { id: "historySection", label: "History" }
+            { id: "deploySection", label: "Deploy Suite" },
+            { id: "historySection", label: "Deploy History" },
           ]
         }
       ];
@@ -627,6 +648,111 @@ export default function Home() {
   const canRunWorkspaceDiff = compareReadinessIssues.length === 0;
   const canRunOrchestrator = orchestratorReadinessIssues.length === 0;
   const canRunDeployFlow = deployReadinessIssues.length === 0;
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const commandActions: CommandAction[] = useMemo(() => [
+    {
+      id: "sync",
+      title: "⚡ One-Click Environment Sync",
+      subtitle: "Autonomous validation, sanitization, dry-run & live deploy",
+      category: "Actions",
+      icon: "⚡",
+      run: () => setActiveSection("syncSection"),
+    },
+    {
+      id: "matrix",
+      title: "🔍 Visual FLS & Profile Matrix",
+      subtitle: "Side-by-side Field-Level Security and Apex Class permissions",
+      category: "Tools",
+      icon: "🔍",
+      run: () => setActiveSection("matrixSection"),
+    },
+    {
+      id: "compare",
+      title: "One-Click Compare",
+      subtitle: "Start comparison between Source and Destination orgs",
+      category: "Actions",
+      icon: "⚖️",
+      run: () => {
+        setActiveSection("jobSection");
+        handleCompare("auto");
+      },
+    },
+    {
+      id: "projects",
+      title: "Projects & Orgs Setup",
+      subtitle: "Manage projects, authorize orgs, and bind targets",
+      category: "Navigation",
+      icon: "📁",
+      run: () => setActiveSection("projectSection"),
+    },
+    {
+      id: "manifests",
+      title: "Manifest Generator",
+      subtitle: "Generate and edit package.xml manifests",
+      category: "Navigation",
+      icon: "📦",
+      run: () => setActiveSection("manifestSection"),
+    },
+    {
+      id: "retrieve",
+      title: "Retrieve Metadata",
+      subtitle: "Chunked or grouped pulls from orgs",
+      category: "Navigation",
+      icon: "📥",
+      run: () => setActiveSection("retrieveSection"),
+    },
+    {
+      id: "diff",
+      title: "Diff & Delta Selection",
+      subtitle: "Select modified components and build delta packages",
+      category: "Navigation",
+      icon: "🌲",
+      run: () => setActiveSection("diffSection"),
+    },
+    {
+      id: "gitDiff",
+      title: "Git Delta Viewer",
+      subtitle: "Visual branch diffs across Apex Classes, LWCs, Triggers, Flows",
+      category: "Navigation",
+      icon: "🌿",
+      run: () => setActiveSection("gitDiffSection"),
+    },
+    {
+      id: "deploy",
+      title: "Deploy Suite",
+      subtitle: "Test levels, check-only simulation, live promotion",
+      category: "Navigation",
+      icon: "🚀",
+      run: () => setActiveSection("deploySection"),
+    },
+    {
+      id: "history",
+      title: "Deployment History",
+      subtitle: "Past runs, async IDs, and metadata.zip download",
+      category: "Navigation",
+      icon: "📜",
+      run: () => setActiveSection("historySection"),
+    },
+    {
+      id: "theme",
+      title: `Toggle Theme (Current: ${theme})`,
+      subtitle: "Switch between Dark and Light mode",
+      category: "Tools",
+      icon: theme === "dark" ? "☀️" : "🌙",
+      run: () => handleThemeChange(theme === "dark" ? "light" : "dark"),
+    },
+  ], [theme]);
   const checklistItems = useMemo(() => {
     const hasProject = Boolean(state.projects.length);
     const hasActiveProject = Boolean(state.activeProject?.id);
@@ -2187,16 +2313,29 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <span className="text-base font-bold tracking-tight text-white">Salesforce DevOps Hub</span>
                   <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/20">
-                    ENTERPRISE
+                    v0.3.0 ENTERPRISE
                   </span>
                 </div>
                 <div className="text-[11px] font-medium text-slate-400">
-                  Automated Metadata Healing & Multi-Pass Deployment Platform
+                  Automated Metadata Healing &amp; Multi-Pass Deployment Platform
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {isSignedIn ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCommandPaletteOpen(true)}
+                  className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs text-slate-400 hover:border-slate-700 hover:text-white transition shadow-inner"
+                  title="Open Universal Command Palette (Cmd+K)"
+                >
+                  <span>🔍 Search or jump to...</span>
+                  <kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 border border-slate-700">
+                    ⌘K
+                  </kbd>
+                </button>
+              ) : null}
               {isSignedIn ? (
                 <div className="flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/90 p-1 shadow-inner">
                   <button
@@ -2504,6 +2643,34 @@ export default function Home() {
                 onNavigateTab={(tab) => {
                   if (tab === "sync") setActiveSection("syncSection");
                   else if (tab === "diff") setActiveSection("diffSection");
+                }}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {isSignedIn && activeSection === "matrixSection" ? (
+          <section id="matrixSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)] dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg font-bold">🔍 Visual Profile &amp; FLS Parity Matrix</h2>
+                <p className="text-xs text-[var(--muted)]">Inspect and mirror field-level security, Apex controller accesses, and tab visibilities.</p>
+              </div>
+              <button
+                className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
+                onClick={() => setActiveSection("dashboardSection")}
+              >
+                Back to Dashboard
+              </button>
+            </div>
+            {renderGuide("matrixSection")}
+            <div className="mt-6">
+              <PermissionMatrixPanel
+                activeProject={state.activeProject}
+                orgs={state.orgs}
+                onDeployDelta={async (xml) => {
+                  setDeltaManifest(xml);
+                  setActiveSection("deploySection");
                 }}
               />
             </div>
@@ -4610,6 +4777,29 @@ export default function Home() {
               </div>
             </div>
           </div>
+        ) : null}
+
+        {isSignedIn ? (
+          <>
+            <FloatingJobDock
+              currentProcess={currentProcess}
+              deployJobId={deployJobId}
+              compareJobId={compareJobId}
+              deployStatus={deployStatus}
+              compareStatus={compareStatus}
+              onOpenSection={setActiveSection}
+              lastDeployStatus={state.lastDeploy?.status}
+              activeProjectName={state.activeProject?.name}
+              sourceOrg={state.activeProject?.sourceOrg}
+              destOrg={state.activeProject?.destinationOrg}
+            />
+
+            <CommandPalette
+              isOpen={isCommandPaletteOpen}
+              onClose={() => setIsCommandPaletteOpen(false)}
+              actions={commandActions}
+            />
+          </>
         ) : null}
       </div>
     </div>
