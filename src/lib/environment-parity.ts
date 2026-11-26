@@ -25,17 +25,34 @@ export interface EnvironmentParityReport {
 }
 
 /**
+ * Dynamically queries all customizable objects from an org (both standard and custom).
+ * No hardcoding of object names.
+ */
+export function discoverOrgObjects(org: string): string[] {
+  try {
+    const q = "SELECT QualifiedApiName FROM EntityDefinition WHERE IsCustomizable = true AND (KeyPrefix != null OR IsCustomSetting = false) LIMIT 250";
+    const res = runSoql(org, q);
+    return res?.records?.map((r: any) => r.QualifiedApiName).filter(Boolean) || [];
+  } catch (e) {
+    console.warn(`Failed to discover objects in ${org}, falling back to core objects`, e);
+    return ['Case', 'Account', 'Contact', 'Task', 'Opportunity', 'Lead'];
+  }
+}
+
+/**
  * Audit Field-Level Security and Action Override parity between two orgs.
+ * Dynamically discovers customizable objects if targetObjects is omitted.
  */
 export function auditOrgParity(
   sourceOrg: string,
   destOrg: string,
-  targetObjects: string[] = ['Case', 'Account', 'Contact', 'Task']
+  targetObjects?: string[]
 ): EnvironmentParityReport {
   const metrics: ParityMetric[] = [];
   const recommendations: string[] = [];
+  const objects = targetObjects && targetObjects.length > 0 ? targetObjects : discoverOrgObjects(sourceOrg);
 
-  for (const obj of targetObjects) {
+  for (const obj of objects) {
     const q = `SELECT COUNT(Id) cnt FROM FieldPermissions WHERE SobjectType = '${obj}'`;
     let srcCount = 0;
     let dstCount = 0;
@@ -43,16 +60,18 @@ export function auditOrgParity(
     try {
       const srcRes = runSoql(sourceOrg, q);
       srcCount = srcRes?.records?.[0]?.cnt || 0;
-    } catch (e) {
-      console.error(`Failed to query FLS in ${sourceOrg} for ${obj}`, e);
+    } catch {
+      // Object may not exist or support FieldPermissions in source
     }
 
     try {
       const dstRes = runSoql(destOrg, q);
       dstCount = dstRes?.records?.[0]?.cnt || 0;
-    } catch (e) {
-      console.error(`Failed to query FLS in ${destOrg} for ${obj}`, e);
+    } catch {
+      // Object may not exist or support FieldPermissions in dest
     }
+
+    if (srcCount === 0 && dstCount === 0) continue;
 
     const delta = srcCount - dstCount;
     let status: 'IN_SYNC' | 'FLS_MISSING_IN_DEST' | 'FLS_MISSING_IN_SOURCE' = 'IN_SYNC';
@@ -104,10 +123,9 @@ export const PREVIEW_OBJECT_BLACKLIST = new Set([
 
 export function isPermissibleObject(objectName: string): boolean {
   if (PREVIEW_OBJECT_BLACKLIST.has(objectName)) return false;
-  // Allow custom objects and core CRM objects
   return (
     objectName.endsWith('__c') ||
-    ['Account', 'Contact', 'Case', 'Task', 'Event', 'Scorecard', 'Knowledge__kav', 'User'].includes(objectName)
+    ['Account', 'Contact', 'Case', 'Task', 'Event', 'Scorecard', 'Knowledge__kav', 'User', 'Lead', 'Opportunity'].includes(objectName)
   );
 }
 
@@ -117,6 +135,19 @@ export function isPermissibleObject(objectName: string): boolean {
  */
 export function sanitizeFolderShares(xmlContent: string): string {
   return xmlContent.replace(/<folderShares>[\s\S]*?<\/folderShares>/g, '');
+}
+
+/**
+ * Dynamically resolves an active administrator username in the destination org.
+ */
+export function getDestinationAdminUsername(destOrg: string): string {
+  try {
+    const q = "SELECT Username FROM User WHERE IsActive = true AND Profile.PermissionsModifyAllData = true ORDER BY CreatedDate ASC LIMIT 1";
+    const res = runSoql(destOrg, q);
+    return res?.records?.[0]?.Username || '';
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -154,21 +185,64 @@ export function mergeAppMenuDefinitions(targetXml: string, sourceCustomApps: str
 }
 
 /**
- * Detects third-party managed package namespace references in Apex, LWC, or XML metadata.
- * Flags missing dependencies before deployment (e.g., purecloud, npe01, SBQQ, copado).
+ * Dynamically queries installed package namespaces from an org via Tooling API / SOQL.
  */
-export function detectManagedPackageDependencies(content: string): string[] {
-  const knownNamespaces = ['purecloud', 'npe01', 'npsp', 'SBQQ', 'copado', 'agf', 'et4ae5', 'flc'];
-  const detected = new Set<string>();
+export function getInstalledPackageNamespaces(org: string): Set<string> {
+  const namespaces = new Set<string>();
+  try {
+    const q = "SELECT NamespacePrefix FROM InstalledSubscriberPackage";
+    const res = runSoql(org, q);
+    res?.records?.forEach((r: any) => {
+      if (r.NamespacePrefix) namespaces.add(r.NamespacePrefix.toLowerCase());
+    });
+  } catch {
+    // If InstalledSubscriberPackage query is not supported, fallback to ApexClass namespaces
+    try {
+      const q = "SELECT NamespacePrefix FROM ApexClass WHERE NamespacePrefix != null GROUP BY NamespacePrefix";
+      const res = runSoql(org, q);
+      res?.records?.forEach((r: any) => {
+        if (r.NamespacePrefix) namespaces.add(r.NamespacePrefix.toLowerCase());
+      });
+    } catch {}
+  }
+  return namespaces;
+}
 
-  for (const ns of knownNamespaces) {
-    const regex = new RegExp(`\\b${ns}\\b[.:_]`, 'i');
-    if (regex.test(content)) {
-      detected.add(ns);
+/**
+ * Dynamically detects third-party managed package dependencies by comparing
+ * source installed packages vs destination installed packages, and scanning metadata content.
+ * 100% dynamic — no hardcoded package lists.
+ */
+export function detectMissingPackageDependencies(
+  sourceOrg: string,
+  destOrg: string,
+  contentToScan?: string
+): string[] {
+  const missing = new Set<string>();
+  const srcNamespaces = getInstalledPackageNamespaces(sourceOrg);
+  const dstNamespaces = getInstalledPackageNamespaces(destOrg);
+
+  // Check which source namespaces are missing in destination
+  srcNamespaces.forEach((ns) => {
+    if (!dstNamespaces.has(ns)) {
+      missing.add(ns);
+    }
+  });
+
+  // Also scan provided content for namespace references
+  if (contentToScan) {
+    const namespaceRegex = /\b([a-zA-Z0-9_]{2,15})__([a-zA-Z0-9_]+)/g;
+    let match;
+    while ((match = namespaceRegex.exec(contentToScan)) !== null) {
+      const ns = match[1].toLowerCase();
+      // If it looks like a managed package namespace and is not installed in destination
+      if (srcNamespaces.has(ns) && !dstNamespaces.has(ns)) {
+        missing.add(ns);
+      }
     }
   }
 
-  return Array.from(detected);
+  return Array.from(missing);
 }
 
 /**
@@ -201,6 +275,7 @@ export interface UserParityReport {
   timestamp: string;
   sourceOrg: string;
   destOrg: string;
+  fieldsAudited: string[];
   sourceUsersWithData: number;
   destUsersWithData: number;
   unalignedDestUsers: string[];
@@ -208,15 +283,44 @@ export interface UserParityReport {
 }
 
 /**
- * Audits record-level data parity for User custom fields (e.g., Type__c, On_Extended_Leave__c)
- * which drive case routing, queueables, and approval workflows.
+ * Dynamically queries all custom fields defined on the User object in an org.
+ * No hardcoding of field names.
+ */
+export function discoverUserCustomFields(org: string): string[] {
+  try {
+    const q = "SELECT QualifiedApiName FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = 'User' AND IsCustom = true";
+    const res = runSoql(org, q);
+    return res?.records?.map((r: any) => r.QualifiedApiName).filter(Boolean) || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Dynamically audits record-level data parity for User custom fields.
+ * If keyFields is omitted, dynamically discovers all custom fields on User.
  */
 export function auditUserParity(
   sourceOrg: string,
   destOrg: string,
-  keyFields: string[] = ['Type__c', 'On_Extended_Leave__c']
+  keyFields?: string[]
 ): UserParityReport {
-  const fieldsClause = ['Id', 'Name', 'Username', ...keyFields].join(', ');
+  const fieldsToAudit = keyFields && keyFields.length > 0 ? keyFields : discoverUserCustomFields(sourceOrg);
+
+  if (fieldsToAudit.length === 0) {
+    return {
+      timestamp: new Date().toISOString(),
+      sourceOrg,
+      destOrg,
+      fieldsAudited: [],
+      sourceUsersWithData: 0,
+      destUsersWithData: 0,
+      unalignedDestUsers: [],
+      recommendations: []
+    };
+  }
+
+  const fieldsClause = ['Id', 'Name', 'Username', ...fieldsToAudit].join(', ');
   const q = `SELECT ${fieldsClause} FROM User WHERE IsActive = true`;
 
   let srcRecords: any[] = [];
@@ -237,14 +341,14 @@ export function auditUserParity(
     console.error(`Failed to query Users in ${destOrg}`, e);
   }
 
-  const srcPopulated = srcRecords.filter(u => keyFields.some(f => u[f] != null)).length;
-  const dstPopulated = dstRecords.filter(u => keyFields.some(f => u[f] != null)).length;
+  const srcPopulated = srcRecords.filter(u => fieldsToAudit.some(f => u[f] != null)).length;
+  const dstPopulated = dstRecords.filter(u => fieldsToAudit.some(f => u[f] != null)).length;
   const unalignedDestUsers: string[] = [];
 
   for (const dstUser of dstRecords) {
     const matchingSrc = srcRecords.find(s => s.Name === dstUser.Name);
     if (matchingSrc) {
-      for (const field of keyFields) {
+      for (const field of fieldsToAudit) {
         if (matchingSrc[field] != null && dstUser[field] == null) {
           unalignedDestUsers.push(`${dstUser.Name} (${dstUser.Username}): missing ${field} (Source has '${matchingSrc[field]}')`);
         }
@@ -254,7 +358,7 @@ export function auditUserParity(
 
   if (unalignedDestUsers.length > 0) {
     recommendations.push(
-      `Synchronize User custom field data in destination org (${destOrg}): ${unalignedDestUsers.length} user record differences detected that may impact case routing.`
+      `Synchronize User custom field data in destination org (${destOrg}): ${unalignedDestUsers.length} user record differences detected across fields [${fieldsToAudit.join(', ')}].`
     );
   }
 
@@ -262,6 +366,7 @@ export function auditUserParity(
     timestamp: new Date().toISOString(),
     sourceOrg,
     destOrg,
+    fieldsAudited: fieldsToAudit,
     sourceUsersWithData: srcPopulated,
     destUsersWithData: dstPopulated,
     unalignedDestUsers,
