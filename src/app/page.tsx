@@ -3,13 +3,9 @@
 import { AuthCard } from "@/components/auth-card";
 import { ServerVersionBadge } from "@/components/server-version-badge";
 import { OrchestratorFlow } from "@/components/orchestrator-flow";
-import { ModernNav, NavTab } from "@/components/modern-nav";
 import { OneClickSyncPanel } from "@/components/views/one-click-sync-panel";
 import { ParityPanel } from "@/components/views/parity-panel";
 import { GitDiffPanel } from "@/components/views/git-diff-panel";
-import { ManifestRetrievePanel } from "@/components/views/manifest-retrieve-panel";
-import { HistoryPanel } from "@/components/views/history-panel";
-import { SettingsPanel } from "@/components/views/settings-panel";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { translateError } from "@/lib/error-help";
@@ -45,6 +41,39 @@ type ReadinessIssue = {
 
 const sectionGuides: Record<string, SectionGuide> = {
 
+  syncSection: {
+    eyebrow: "Autonomous Parity",
+    title: "One-Click Environment Synchronization",
+    summary: "Automatically sanitize metadata, run a pre-flight dry run simulation, deploy live components, and align user routing data with zero drift.",
+    steps: [
+      "Select pre-flight simulation to test deployability without making changes.",
+      "Enable auto-sanitization to strip unshareable folders and map dashboard running users to destination admins.",
+      "Click 'Start Autonomous Environment Sync' and monitor live progress."
+    ],
+    success: "Environments are in 100% parity across metadata, permissions, and user configuration."
+  },
+  paritySection: {
+    eyebrow: "Parity Scanner",
+    title: "Cross-Environment Parity Audit",
+    summary: "Inspect deep metadata differences, missing package dependencies, and profile permissions between sandboxes.",
+    steps: [
+      "Verify connected source and destination orgs.",
+      "Review package namespace compatibility.",
+      "Identify drift before running synchronization."
+    ],
+    success: "Complete visibility into cross-org parity and readiness."
+  },
+  gitDiffSection: {
+    eyebrow: "Git Diff",
+    title: "Cross-Branch Git Comparison",
+    summary: "View direct Git diffs between the source and destination metadata branches.",
+    steps: [
+      "Filter by domain (Apex Classes, LWCs, Triggers, Flows, Dashboards).",
+      "Inspect modified lines and delta logic.",
+      "Validate what will be promoted."
+    ],
+    success: "Clear visual audit of metadata delta."
+  },
   dashboardSection: {
     eyebrow: "Start Here",
     title: "Read the workspace before you change anything",
@@ -249,8 +278,6 @@ export default function Home() {
   const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "mfa">("login");
   const [theme, setTheme] = useState<"light" | "mint" | "dark" | "sand" | "slate">("dark");
   const [viewMode, setViewMode] = useState<"simple" | "advanced">("simple");
-  const [activeTab, setActiveTab] = useState<NavTab>("sync");
-  const [isClassicView, setIsClassicView] = useState<boolean>(false);
   const [projectEdits, setProjectEdits] = useState<Record<string, string>>({});
   const [selectedOrgAlias, setSelectedOrgAlias] = useState<string>("");
   const [orgDetails, setOrgDetails] = useState<any>(null);
@@ -346,6 +373,15 @@ export default function Home() {
   const navGroups = useMemo(
     () => {
       const groups = [
+        {
+          id: "syncGroup",
+          label: "⚡ One-Click Sync",
+          items: [
+            { id: "syncSection", label: "⚡ One-Click Sync", badge: currentProcess.includes("sync") },
+            { id: "paritySection", label: "🔍 Parity Scanner" },
+            { id: "gitDiffSection", label: "🌲 Git Delta Diff" }
+          ]
+        },
         {
           id: "workflow",
           label: "Workflow",
@@ -2076,176 +2112,8 @@ export default function Home() {
     return <AuthCard />;
   }
 
-  if (!isClassicView) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
-        <ModernNav
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          activeProject={state.activeProject}
-          projects={state.projects}
-          onSelectProject={(projectId) => {
-            const project = state.projects.find((p) => p.id === projectId);
-            if (project) {
-              setState((prev) => ({ ...prev, activeProject: project }));
-            }
-          }}
-          sourceOrg={state.activeProject?.sourceOrg}
-          destOrg={state.activeProject?.destinationOrg}
-          isSyncing={currentProcess.includes("sync") || Boolean(deployJobId) || Boolean(compareJobId)}
-          theme={theme}
-          onThemeChange={handleThemeChange}
-          user={state.user}
-          onLogout={handleLogout}
-        />
-
-        <main className="mx-auto max-w-7xl px-6 py-8 flex flex-col gap-6">
-          {uiNotice ? (
-            <section
-              className={`rounded-2xl border px-4 py-3 text-sm flex items-center justify-between ${
-                uiNotice.type === "error"
-                  ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
-              }`}
-            >
-              <div>{uiNotice.message}</div>
-              <button
-                className="text-xs font-semibold opacity-75 hover:opacity-100"
-                onClick={() => setUiNotice(null)}
-              >
-                ✕ Dismiss
-              </button>
-            </section>
-          ) : null}
-
-          {/* Active Tab View */}
-          {activeTab === "sync" && (
-            <OneClickSyncPanel
-              activeProject={state.activeProject}
-              orgs={state.orgs}
-              onNavigateTab={setActiveTab}
-            />
-          )}
-
-          {activeTab === "parity" && (
-            <ParityPanel
-              activeProject={state.activeProject}
-              orgs={state.orgs}
-            />
-          )}
-
-          {activeTab === "diff" && (
-            <GitDiffPanel
-              activeProject={state.activeProject}
-              onNavigateTab={setActiveTab}
-            />
-          )}
-
-          {activeTab === "manifest" && (
-            <ManifestRetrievePanel
-              activeProject={state.activeProject}
-              sourceManifest={sourceManifestValue}
-              destManifest={destManifestValue}
-              onSourceManifestChange={setSourceManifestValue}
-              onDestManifestChange={setDestManifestValue}
-              onGenerateManifest={handleGenerateManifest}
-              onSaveManifest={handleSaveManifest}
-              onReloadManifests={refreshManifests}
-              compareStrategy={compareStrategy}
-              onCompareStrategyChange={setCompareStrategy}
-              retrieveMode={retrieveMode}
-              onRetrieveModeChange={setRetrieveMode}
-              retrieveRunning={retrieveRunning}
-              onRetrieve={handleRetrieve}
-              onStopRetrieve={handleStopRetrieve}
-              retrieveEntries={retrieveEntries}
-            />
-          )}
-
-          {activeTab === "history" && (
-            <HistoryPanel
-              activeProject={state.activeProject}
-              onNavigateTab={setActiveTab}
-            />
-          )}
-
-          {activeTab === "settings" && (
-            <SettingsPanel
-              activeProject={state.activeProject}
-              projects={state.projects}
-              orgs={state.orgs}
-              onSelectProject={(projectId) => {
-                const project = state.projects.find((p) => p.id === projectId);
-                if (project) {
-                  setState((prev) => ({ ...prev, activeProject: project }));
-                }
-              }}
-              onCreateProject={async (name) => {
-                const project = await api("/api/projects", { method: "POST", body: JSON.stringify({ name }) });
-                setOutput(project);
-                await loadProjects();
-              }}
-              onDeleteProject={handleDeleteProject}
-              onAttachOrgs={async (sourceOrg, destinationOrg) => {
-                if (!state.activeProject) return;
-                const project = await api(`/api/projects/${state.activeProject.id}/orgs`, {
-                  method: "POST",
-                  body: JSON.stringify({ sourceOrg, destinationOrg }),
-                });
-                setOutput(project);
-                setState((prev) => ({ ...prev, activeProject: project }));
-              }}
-              onAddOrg={async (alias, sfdxAuthUrl) => {
-                const org = await api("/api/orgs", { method: "POST", body: JSON.stringify({ alias, sfdxAuthUrl }) });
-                setOutput(org);
-                await loadOrgs();
-              }}
-              onDeleteOrg={handleDeleteOrg}
-              user={state.user}
-              theme={theme}
-              onThemeChange={handleThemeChange}
-            />
-          )}
-
-          {/* Minimal Modern Footer */}
-          <footer className="mt-12 border-t border-slate-200/80 pt-6 pb-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">SFDX DevOps Platform</span>
-              <span>· Enterprise Multi-Org Parity Engine</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsClassicView(true)}
-                className="hover:text-sky-600 dark:hover:text-sky-400 font-medium transition"
-              >
-                Switch to Classic Console
-              </button>
-              <a href="/docs" target="_blank" className="hover:text-sky-600 dark:hover:text-sky-400 transition">
-                Documentation
-              </a>
-              <a href="https://github.com/sfdcai/sfdx-toolkit" target="_blank" className="hover:text-sky-600 dark:hover:text-sky-400 transition">
-                GitHub
-              </a>
-            </div>
-          </footer>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen">
-      {isClassicView ? (
-        <div className="sticky top-0 z-50 flex items-center justify-between bg-sky-900 px-4 py-2 text-xs font-semibold text-white shadow-md">
-          <span>You are viewing the legacy Classic Console.</span>
-          <button
-            onClick={() => setIsClassicView(false)}
-            className="rounded-lg bg-sky-600 px-3 py-1 font-bold text-white hover:bg-sky-500 transition shadow-sm"
-          >
-            ⚡ Switch to Modern DevOps Hub
-          </button>
-        </div>
-      ) : null}
 
       {isSignedIn && viewMode === "advanced" ? (
       <aside
@@ -2454,6 +2322,14 @@ export default function Home() {
                 >
                   One Click Compare
                 </button>
+                <button
+                  className="flex items-center gap-1.5 rounded-full border border-sky-400 bg-gradient-to-r from-sky-500 to-indigo-600 px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-sm hover:brightness-110 transition"
+                  onClick={() => setActiveSection("syncSection")}
+                  title="Open Autonomous One-Click Environment Sync"
+                >
+                  <span>⚡</span>
+                  <span>One-Click Sync</span>
+                </button>
               </div>
             </div>
           ) : null}
@@ -2552,6 +2428,88 @@ export default function Home() {
             </div>
           </section>
         ) : null}
+        {isSignedIn && activeSection === "syncSection" ? (
+          <section id="syncSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)] dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg font-bold">⚡ One-Click Environment Synchronization</h2>
+                <p className="text-xs text-[var(--muted)]">Autonomous pre-flight validation, sanitization, dry-run simulation, and live promotion.</p>
+              </div>
+              <button
+                className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
+                onClick={() => setActiveSection("dashboardSection")}
+              >
+                Back to Dashboard
+              </button>
+            </div>
+            {renderGuide("syncSection")}
+            <div className="mt-6">
+              <OneClickSyncPanel
+                activeProject={state.activeProject}
+                orgs={state.orgs}
+                onNavigateTab={(tab) => {
+                  if (tab === "parity") setActiveSection("paritySection");
+                  else if (tab === "diff") setActiveSection("gitDiffSection");
+                  else if (tab === "manifest") setActiveSection("manifestSection");
+                  else if (tab === "history") setActiveSection("historySection");
+                  else if (tab === "settings") setActiveSection("projectSection");
+                }}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {isSignedIn && activeSection === "paritySection" ? (
+          <section id="paritySection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)] dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg font-bold">🔍 Environment Parity Scanner</h2>
+                <p className="text-xs text-[var(--muted)]">Deep metadata and package dependency audit between Source and Destination orgs.</p>
+              </div>
+              <button
+                className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
+                onClick={() => setActiveSection("syncSection")}
+              >
+                Go to One-Click Sync
+              </button>
+            </div>
+            {renderGuide("paritySection")}
+            <div className="mt-6">
+              <ParityPanel
+                activeProject={state.activeProject}
+                orgs={state.orgs}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {isSignedIn && activeSection === "gitDiffSection" ? (
+          <section id="gitDiffSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)] dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg font-bold">🌲 Git Delta Comparison</h2>
+                <p className="text-xs text-[var(--muted)]">Visual branch diffs across Apex Classes, LWCs, Triggers, Flows, and Dashboards.</p>
+              </div>
+              <button
+                className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
+                onClick={() => setActiveSection("diffSection")}
+              >
+                Go to Detailed Diff
+              </button>
+            </div>
+            {renderGuide("gitDiffSection")}
+            <div className="mt-6">
+              <GitDiffPanel
+                activeProject={state.activeProject}
+                onNavigateTab={(tab) => {
+                  if (tab === "sync") setActiveSection("syncSection");
+                  else if (tab === "diff") setActiveSection("diffSection");
+                }}
+              />
+            </div>
+          </section>
+        ) : null}
+
         {isSignedIn && activeSection === "dashboardSection" ? (
         <section id="dashboardSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2564,6 +2522,32 @@ export default function Home() {
             </button>
           </div>
           {renderGuide("dashboardSection")}
+
+          {/* Quick-Launch One-Click Sync Banner */}
+          <div className="mt-6 rounded-2xl border border-sky-300 bg-gradient-to-r from-sky-50 via-indigo-50 to-sky-50 p-5 shadow-sm dark:border-sky-800 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white font-bold text-xl shadow-md shadow-sky-500/25">
+                ⚡
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">One-Click Environment Synchronization</h3>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                    NEW FEATURE
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  Autonomous pre-flight validation, dynamic metadata sanitization, dry-run simulation, and live delta sync.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveSection("syncSection")}
+              className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-500 transition shrink-0"
+            >
+              Launch One-Click Sync ➔
+            </button>
+          </div>
           <div className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
