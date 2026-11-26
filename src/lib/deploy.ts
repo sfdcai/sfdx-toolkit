@@ -4,6 +4,7 @@ import path from 'path';
 import { execFileSync } from 'node:child_process';
 import { buildPackageXml, parseManifestComponents, parseMetadataPath, METADATA_FOLDERS } from './metadata';
 import { getSfCommand, getSfEnv } from './sf';
+import { sanitizeFolderShares, sanitizeDashboardMetadata } from './environment-parity';
 
 export interface DeployArgs {
   projectPath: string;
@@ -1203,4 +1204,47 @@ export function enrichManifestForParity(
   }
 
   return enriched;
+}
+
+/**
+ * Automatically sanitizes staged deployment metadata files to prevent common
+ * Salesforce Metadata API rejections (e.g., folderShares referencing missing sandbox users,
+ * invalid runningUser sandbox suffixes in dashboards).
+ */
+export function sanitizeStagedDeploymentFiles(targetDir: string, fallbackRunningUser?: string): number {
+  if (!fs.existsSync(targetDir)) return 0;
+  let sanitizedCount = 0;
+
+  function walk(dir: string) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (entry.isFile()) {
+        if (
+          entry.name.endsWith('.dashboardFolder-meta.xml') ||
+          entry.name.endsWith('.emailFolder-meta.xml') ||
+          entry.name.endsWith('.reportFolder-meta.xml')
+        ) {
+          const original = fs.readFileSync(fullPath, 'utf8');
+          const sanitized = sanitizeFolderShares(original);
+          if (sanitized !== original) {
+            fs.writeFileSync(fullPath, sanitized, 'utf8');
+            sanitizedCount++;
+          }
+        } else if (entry.name.endsWith('.dashboard-meta.xml')) {
+          const original = fs.readFileSync(fullPath, 'utf8');
+          const sanitized = sanitizeDashboardMetadata(original, fallbackRunningUser);
+          if (sanitized !== original) {
+            fs.writeFileSync(fullPath, sanitized, 'utf8');
+            sanitizedCount++;
+          }
+        }
+      }
+    }
+  }
+
+  walk(targetDir);
+  return sanitizedCount;
 }
