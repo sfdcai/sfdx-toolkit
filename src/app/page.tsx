@@ -294,6 +294,8 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"simple" | "advanced">("simple");
   const [projectEdits, setProjectEdits] = useState<Record<string, string>>({});
   const [selectedOrgAlias, setSelectedOrgAlias] = useState<string>("");
+  const [workspaceTab, setWorkspaceTab] = useState<"projects" | "orgs">("projects");
+  const [showPipelineOverview, setShowPipelineOverview] = useState<boolean>(false);
   const [orgDetails, setOrgDetails] = useState<any>(null);
   const [orgAuthInput, setOrgAuthInput] = useState<string>("");
   const [orgAliasInput, setOrgAliasInput] = useState<string>("");
@@ -2239,285 +2241,306 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen">
-
-      {isSignedIn && viewMode === "advanced" ? (
-      <aside
-        className="z-10 w-full overflow-y-auto overscroll-y-contain border-b border-[var(--line)] bg-white/80 p-4 md:fixed md:left-0 md:top-0 md:h-screen md:w-64 md:border-b-0 md:border-r"
-      >
-        <div className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">Workflow</div>
-        <div className="mt-4 space-y-4">
-          {navGroups.map((group) => {
-            const expanded = Boolean(navGroupState[group.id]);
-            return (
-              <div key={group.id} className="space-y-2">
-                <button
-                  className="flex w-full items-center justify-between rounded-2xl border border-[var(--line)] px-3 py-2 text-xs uppercase tracking-[0.3em] text-[var(--muted)]"
-                  onClick={() => toggleNavGroup(group.id)}
-                  aria-expanded={expanded}
-                >
-                  <span>{group.label}</span>
-                  <span className="text-base">{expanded ? "−" : "+"}</span>
-                </button>
-                {expanded ? (
-                  <div className="space-y-2 px-1">
-                    {group.items.map((item) => (
-                      <button
-                        key={item.id}
-                        className={`block w-full rounded-2xl border px-3 py-2 text-sm transition ${
-                          activeSection === item.id
-                            ? "border-sky-400/80 bg-slate-800 text-sky-400 font-bold shadow-sm ring-1 ring-sky-400/30"
-                            : "border-transparent text-slate-400 hover:text-white hover:bg-slate-900"
-                        }`}
-                        onClick={() => setActiveSection(item.id)}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span>{item.label}</span>
-                          {item.badge ? <span className="h-2 w-2 rounded-full bg-emerald-500"></span> : null}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--ink)] transition-colors">
+      {/* Primary Global Navigation & Context Header */}
+      <header className="glass sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-3">
+          {/* Brand & Edition */}
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-violet-600 text-white shadow-lg shadow-sky-500/25">
+              <span className="text-lg font-bold">⚡</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold tracking-tight text-white">Salesforce DevOps Platform</span>
+                <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/20">
+                  v0.3.0 ENTERPRISE
+                </span>
               </div>
-            );
-          })}
-        </div>
-        <div className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-3 text-xs text-[var(--muted)]">
-          This workflow is linear: add orgs, generate manifests, retrieve, compare, deploy.
-        </div>
-        <div className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-semibold">Current guide: {activeGuide.eyebrow}</span>
-            <button
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-300 bg-white text-sm font-semibold text-sky-700"
-              onClick={() => toggleGuide(activeSection)}
-              title="Toggle current section guide"
-            >
-              i
-            </button>
-          </div>
-          <div className="mt-2">{activeGuide.summary}</div>
-        </div>
-      </aside>
-      ) : null}
-
-      <div className={isSignedIn && viewMode === "advanced" ? "md:ml-64" : ""}>
-        <header className="glass sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-lg shadow-sky-500/25">
-                <span className="text-lg font-bold">⚡</span>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-bold tracking-tight text-white">Salesforce DevOps Hub</span>
-                  <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/20">
-                    v0.3.0 ENTERPRISE
-                  </span>
-                </div>
-                <div className="text-[11px] font-medium text-slate-400">
-                  Automated Metadata Healing &amp; Multi-Pass Deployment Platform
-                </div>
+              <div className="text-[11px] font-medium text-slate-400">
+                Multi-Tenant Parity Engine &amp; Autonomous Multi-Pass Release Suite
               </div>
             </div>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              {isSignedIn ? (
+          {/* Connected Context: Active Project & Orgs */}
+          {isSignedIn ? (
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-3.5 py-1.5 shadow-inner">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-slate-400">Project:</span>
+                <select
+                  value={state.activeProject?.id || ""}
+                  onChange={(e) => {
+                    const project = state.projects.find((item) => item.id === e.target.value) || null;
+                    setState((prev) => ({ ...prev, activeProject: project }));
+                  }}
+                  className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-xs font-bold text-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  {projectOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="h-4 w-px bg-slate-800" />
+
+              {/* Source -> Target Connection */}
+              <div className="flex items-center gap-2">
+                {state.activeProject?.sourceOrg ? (
+                  <span className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-violet-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
+                    {state.activeProject.sourceOrg}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setActiveSection("projectSection")}
+                    className="text-[11px] text-amber-400 hover:underline"
+                  >
+                    + Bind Source
+                  </button>
+                )}
+
+                <span className="text-slate-500 text-xs font-bold">➔</span>
+
+                {state.activeProject?.destinationOrg ? (
+                  <span className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-emerald-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {state.activeProject.destinationOrg}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setActiveSection("projectSection")}
+                    className="text-[11px] text-amber-400 hover:underline"
+                  >
+                    + Bind Target
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Quick Actions & Profile */}
+          <div className="flex items-center gap-2.5">
+            {isSignedIn ? (
+              <>
                 <button
                   type="button"
                   onClick={() => setIsCommandPaletteOpen(true)}
-                  className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs text-slate-400 hover:border-slate-700 hover:text-white transition shadow-inner"
+                  className="hidden md:flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs text-slate-400 hover:border-slate-700 hover:text-white transition shadow-inner"
                   title="Open Universal Command Palette (Cmd+K)"
                 >
-                  <span>🔍 Search or jump to...</span>
+                  <span>🔍 Search</span>
                   <kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 border border-slate-700">
                     ⌘K
                   </kbd>
                 </button>
-              ) : null}
-              {isSignedIn ? (
-                <div className="flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/90 p-1 shadow-inner">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("simple")}
-                    className={`rounded-full px-3 py-1 text-xs font-bold transition ${
-                      viewMode === "simple"
-                        ? "bg-sky-400 text-slate-950 shadow-sm"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Simple
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("advanced")}
-                    className={`rounded-full px-3 py-1 text-xs font-bold transition ${
-                      viewMode === "advanced"
-                        ? "bg-slate-800 text-sky-400 border border-sky-500/50 shadow-sm"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Advanced
-                  </button>
-                </div>
-              ) : null}
-              <ServerVersionBadge />
-              <select
-                className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs"
-                value={theme}
-                onChange={(event) => handleThemeChange(event.target.value as "light" | "mint" | "dark" | "sand" | "slate")}
-              >
-                <option value="light">⛅ Sky &amp; Slate</option>
-                <option value="mint">🌿 Cloud Mint</option>
-                <option value="dark">🌙 Twilight Dim</option>
-              </select>
-              <button
-                className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs text-[var(--muted)]"
-                onClick={() => {
-                  if (!isSignedIn) return;
-                  setActiveSection("profileSection");
-                }}
-              >
-                {state.user ? `Signed in: ${state.user.email}` : "Not signed in"}
-              </button>
-              {isSignedIn && state.user?.role === "super_admin" ? (
+
                 <button
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
-                  onClick={() => window.location.assign("/super-admin")}
-                >
-                  Super Admin
-                </button>
-              ) : null}
-              {isSignedIn && state.user?.role === "company_admin" ? (
-                <button
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
-                  onClick={() => window.location.assign("/admin")}
-                >
-                  Admin
-                </button>
-              ) : null}
-              <button
-                className="rounded-full border border-sky-400/50 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-                onClick={() => window.location.assign("/")}
-                title="Open comprehensive SFDX DevOps Hub & Feature Showcase"
-              >
-                🌟 Product Hub
-              </button>
-              <button
-                className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
-                onClick={() => window.open("/docs", "_blank")}
-              >
-                Docs
-              </button>
-              {isSignedIn ? (
-                <button className="rounded-full border border-[var(--line)] px-3 py-1 text-xs" onClick={handleLogout}>
-                  Logout
-                </button>
-              ) : null}
-            </div>
-          </div>
-          {isSignedIn ? (
-            <div className="border-t border-[var(--line)] bg-white/80 px-6 py-2">
-              <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
-                <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-700">
-                  <span className={`h-2 w-2 rounded-full ${state.activeProject?.id ? "bg-emerald-500" : "bg-amber-400"}`}></span>
-                  Project: {state.activeProject?.name || "none"}
-                </span>
-                <span className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-700">
-                  <span className={`h-2 w-2 rounded-full ${state.activeProject?.sourceOrg ? "bg-emerald-500" : "bg-amber-400"}`}></span>
-                  Source: {state.activeProject?.sourceOrg || "unset"}
-                </span>
-                <span className="flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-sky-700">
-                  <span className={`h-2 w-2 rounded-full ${state.activeProject?.destinationOrg ? "bg-emerald-500" : "bg-amber-400"}`}></span>
-                  Destination: {state.activeProject?.destinationOrg || "unset"}
-                </span>
-                <span className="flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-violet-700">
-                  <span className={`h-2 w-2 rounded-full ${manifestReady ? "bg-emerald-500" : "bg-amber-400"}`}></span>
-                  Manifest: {manifestReady ? "ready" : "needed"}
-                </span>
-                {state.user?.role === "super_admin" ? (
-                  <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-rose-700">
-                    Super Admin
-                  </span>
-                ) : null}
-                <button
-                  className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] ${
-                    canRunCompare
-                      ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                      : "border-slate-200 bg-slate-50 text-slate-400"
-                  }`}
-                  disabled={!canRunCompare}
-                  onClick={() => {
-                    if (!canRunCompare) return;
-                    setActiveSection("jobSection");
-                    handleCompare("auto");
-                  }}
-                  title={
-                    canRunCompare
-                      ? "Start one-click comparison job"
-                      : "Resolve readiness issues before comparison"
-                  }
-                >
-                  One Click Compare
-                </button>
-                <button
-                  className="flex items-center gap-1.5 rounded-full border border-sky-400 bg-gradient-to-r from-sky-500 to-indigo-600 px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-sm hover:brightness-110 transition"
                   onClick={() => setActiveSection("syncSection")}
-                  title="Open Autonomous One-Click Environment Sync"
+                  className="flex items-center gap-1.5 rounded-xl border border-sky-400/40 bg-gradient-to-r from-sky-500 via-indigo-600 to-indigo-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-lg shadow-sky-500/20 hover:brightness-110 transition"
+                  title="Launch Autonomous One-Click Environment Sync"
                 >
                   <span>⚡</span>
                   <span>One-Click Sync</span>
                 </button>
+              </>
+            ) : null}
+
+            {isSignedIn ? (
+              <div className="flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/90 p-0.5 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("simple")}
+                  className={`rounded-full px-2.5 py-1 text-xs font-bold transition ${
+                    viewMode === "simple"
+                      ? "bg-sky-400 text-slate-950 shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Simple
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("advanced")}
+                  className={`rounded-full px-2.5 py-1 text-xs font-bold transition ${
+                    viewMode === "advanced"
+                      ? "bg-slate-800 text-sky-400 border border-sky-500/50 shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Advanced
+                </button>
               </div>
+            ) : null}
+
+            {/* Theme & User */}
+            <select
+              className="rounded-xl border border-slate-800 bg-slate-900 px-2 py-1 text-xs text-slate-300"
+              value={theme}
+              onChange={(e) => handleThemeChange(e.target.value as any)}
+            >
+              <option value="dark">🌙 Dark</option>
+              <option value="light">⛅ Light</option>
+            </select>
+
+            {isSignedIn ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveSection("profileSection")}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs text-slate-300 hover:text-white"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500/30 text-[10px] font-bold text-indigo-300">
+                    {state.user?.email ? state.user.email[0].toUpperCase() : "A"}
+                  </span>
+                  <span className="hidden lg:inline">{state.user?.email || "Account"}</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-xl border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-400 hover:text-rose-400"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Horizontal Lifecycle Strip */}
+        {isSignedIn ? (
+          <div className="border-t border-slate-800/80 bg-slate-950/70 px-6 backdrop-blur-md">
+            <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-auto py-1.5 scrollbar-none">
+              {[
+                { id: "syncSection", label: "One-Click Sync", icon: "⚡", badge: "Live" },
+                { id: "matrixSection", label: "FLS & Parity Matrix", icon: "🔍", badge: "Zero-XML" },
+                { id: "gitDiffSection", label: "Git Delta & Diff", icon: "🌲", count: state.diffChanges.length },
+                { id: "manifestSection", label: "Manifest & Retrieve", icon: "📦", badge: manifestReady ? "Ready" : "Needed" },
+                { id: "deploySection", label: "Deploy & Rollbacks", icon: "🚀", badge: jobRunning ? "Running" : undefined },
+                { id: "projectSection", label: "Workspace & Orgs", icon: "🏢", count: state.projects.length },
+                { id: "historySection", label: "History & Logs", icon: "📜" },
+                { id: "aiInsightsSection", label: "AI Insights & Scans", icon: "🤖" },
+                ...(viewMode === "advanced"
+                  ? [
+                      { id: "orchestratorSection", label: "Pipeline Flow", icon: "📊" },
+                      { id: "cliConsoleSection", label: "CLI Console", icon: "💻" },
+                    ]
+                  : []),
+              ].map((tab) => {
+                const isActive = activeSection === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveSection(tab.id)}
+                    className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
+                      isActive
+                        ? "border border-sky-400/40 bg-sky-500/10 text-sky-400 shadow-sm ring-1 ring-sky-400/20"
+                        : "border border-transparent text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                    }`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                    {tab.badge ? (
+                      <span className="rounded-full bg-sky-500/20 px-1.5 py-0.2 text-[9px] font-bold text-sky-300">
+                        {tab.badge}
+                      </span>
+                    ) : null}
+                    {tab.count !== undefined ? (
+                      <span className="rounded-full bg-slate-800 px-1.5 py-0.2 text-[9px] text-slate-400">
+                        {tab.count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
-          ) : null}
-          {currentProcess ? (
-            <div className="border-t border-[var(--line)] bg-[var(--surface)] px-6 py-2 text-xs text-[var(--muted)]">
-              Running: {currentProcess}
-              {deployJobId ? ` · Job ${deployJobId.slice(0, 6)}` : compareJobId ? ` · Job ${compareJobId.slice(0, 6)}` : ""}
+          </div>
+        ) : null}
+      </header>
+
+      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
+        {isSignedIn && activeSection !== "orchestratorSection" && activeSection !== "dashboardSection" ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 backdrop-blur-md shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-bold text-slate-300">Active Console View:</span>
+              <span className="text-xs font-semibold text-sky-400">
+                {activeSection === "syncSection"
+                  ? "⚡ Autonomous One-Click Environment Sync"
+                  : activeSection === "matrixSection"
+                  ? "🔍 Visual FLS & Profile Parity Matrix"
+                  : activeSection === "gitDiffSection"
+                  ? "🌲 Git Delta & Branch Comparison"
+                  : activeSection === "projectSection"
+                  ? "🏢 Workspace & Salesforce Environments"
+                  : activeSection === "deploySection"
+                  ? "🚀 Multi-Pass Deployment Suite"
+                  : activeGuide.title}
+              </span>
+              <span className="hidden sm:inline text-slate-600">|</span>
+              <span className="hidden sm:inline text-[11px] text-slate-400">
+                {state.activeProject?.name
+                  ? `${state.activeProject.name} (${state.activeProject.sourceOrg || "Unset"} ➔ ${state.activeProject.destinationOrg || "Unset"})`
+                  : "No project selected"}
+              </span>
             </div>
-          ) : null}
-        </header>
-        <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
-          {isSignedIn ? (
-            <OrchestratorFlow
-              activeProject={state.activeProject}
-              projects={state.projects}
-              orgs={state.orgs}
-              hasSourceRetrieve={hasSourceRetrieve}
-              hasDestinationRetrieve={hasDestinationRetrieve}
-              diffCount={state.diffChanges.length}
-              selectedDiffCount={selectedDiffCount}
-              manifestReady={manifestReady}
-              deltaManifest={deltaManifest}
-              deployStatus={deployStatus}
-              deployJobId={deployJobId}
-              currentProcess={currentProcess}
-              onNavigateSection={(sec) => {
-                setActiveSection(sec);
-                setViewMode("advanced");
-              }}
-              onRetrieve={(target) => handleRetrieve(target)}
-              onCompare={(strategy) => handleCompare((strategy || "auto") as any)}
-              onBuildDelta={handleBuildDeltaFromSelection}
-              onDeploy={(options) => triggerOrchestratedDeploy(options)}
-              viewMode={viewMode}
-              onChangeViewMode={setViewMode}
-            />
-          ) : null}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPipelineOverview(!showPipelineOverview)}
+                className="text-xs font-semibold text-slate-400 hover:text-sky-400 transition"
+              >
+                {showPipelineOverview ? "Hide Pipeline Map ▲" : "5-Stage Pipeline Map ▼"}
+              </button>
+              <button
+                onClick={() => toggleGuide(activeSection)}
+                className="text-xs text-slate-500 hover:text-slate-300"
+                title="Toggle Guide"
+              >
+                ℹ️ Guide
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {isSignedIn && (activeSection === "orchestratorSection" || activeSection === "dashboardSection" || showPipelineOverview) ? (
+          <OrchestratorFlow
+            activeProject={state.activeProject}
+            projects={state.projects}
+            orgs={state.orgs}
+            hasSourceRetrieve={hasSourceRetrieve}
+            hasDestinationRetrieve={hasDestinationRetrieve}
+            diffCount={state.diffChanges.length}
+            selectedDiffCount={selectedDiffCount}
+            manifestReady={manifestReady}
+            deltaManifest={deltaManifest}
+            deployStatus={deployStatus}
+            deployJobId={deployJobId}
+            currentProcess={currentProcess}
+            onNavigateSection={(sec) => {
+              setActiveSection(sec);
+              setViewMode("advanced");
+            }}
+            onRetrieve={(target) => handleRetrieve(target)}
+            onCompare={(strategy) => handleCompare((strategy || "auto") as any)}
+            onBuildDelta={handleBuildDeltaFromSelection}
+            onDeploy={(options) => triggerOrchestratedDeploy(options)}
+            viewMode={viewMode}
+            onChangeViewMode={setViewMode}
+          />
+        ) : null}
+
         {uiNotice ? (
           <section
             className={`rounded-2xl border px-4 py-3 text-sm ${
               uiNotice.type === "error"
-                ? "border-rose-200 bg-rose-50 text-rose-700"
-                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                ? "border-rose-900/50 bg-rose-950/40 text-rose-300"
+                : "border-emerald-900/50 bg-emerald-950/40 text-emerald-300"
             }`}
           >
             <div className="flex items-center justify-between gap-3">
               <div>{uiNotice.message}</div>
               <button
-                className="rounded-full border border-transparent px-2 py-1 text-xs hover:border-[var(--line)]"
+                className="rounded-full border border-transparent px-2 py-1 text-xs hover:border-slate-700"
                 onClick={() => setUiNotice(null)}
               >
                 Dismiss
@@ -2525,16 +2548,17 @@ export default function Home() {
             </div>
           </section>
         ) : null}
+
         {uiErrorHelp && uiNotice?.type === "error" ? (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-slate-800">
-            <div className="text-[10px] uppercase tracking-[0.22em] text-amber-700">Recovery Guidance</div>
-            <div className="mt-1 font-semibold">{uiErrorHelp.title}</div>
-            <div className="mt-1 text-sm text-slate-700">{uiErrorHelp.message}</div>
+          <section className="rounded-2xl border border-amber-900/50 bg-amber-950/40 px-4 py-4 text-sm text-slate-200">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-amber-400 font-bold">Recovery Guidance</div>
+            <div className="mt-1 font-semibold text-white">{uiErrorHelp.title}</div>
+            <div className="mt-1 text-sm text-slate-300">{uiErrorHelp.message}</div>
             <div className="mt-3 flex flex-wrap gap-2">
               {uiErrorHelp.actions.map((action, index) => (
                 <span
                   key={`${uiErrorHelp.category}-${index}`}
-                  className="rounded-full border border-amber-200 bg-white px-3 py-1 text-xs text-amber-800"
+                  className="rounded-full border border-amber-800/60 bg-amber-900/20 px-3 py-1 text-xs text-amber-300"
                 >
                   {action}
                 </span>
@@ -2542,30 +2566,33 @@ export default function Home() {
             </div>
           </section>
         ) : null}
-        {isSignedIn ? (
-          <section className="rounded-3xl border border-sky-200 bg-sky-50/70 p-4 text-slate-800 shadow-[var(--card-shadow)]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+
+        {isSignedIn && guideVisibility[activeSection] !== false ? (
+          <div className="rounded-2xl border border-sky-900/40 bg-sky-950/20 px-4 py-3 text-slate-300 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-500/20 text-xs font-bold text-sky-400">
+                ℹ️
+              </span>
               <div>
-                <div className="text-[10px] uppercase tracking-[0.24em] text-sky-700">Guided Workflow</div>
-                <div className="mt-1 text-sm font-semibold">{activeGuide.title}</div>
-                <div className="mt-1 text-sm text-slate-600">{activeGuide.summary}</div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs text-sky-700"
-                  onClick={() => toggleGuide(activeSection)}
-                >
-                  {guideVisibility[activeSection] !== false ? "Hide section guide" : "Show section guide"}
-                </button>
-                <button
-                  className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs text-sky-700"
-                  onClick={() => window.open("/docs", "_blank")}
-                >
-                  Open user docs
-                </button>
+                <span className="text-xs font-semibold text-sky-300">{activeGuide.title}: </span>
+                <span className="text-xs text-slate-400">{activeGuide.summary}</span>
               </div>
             </div>
-          </section>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-slate-300 hover:text-white"
+                onClick={() => window.open("/docs", "_blank")}
+              >
+                Docs
+              </button>
+              <button
+                className="text-xs text-slate-400 hover:text-white"
+                onClick={() => toggleGuide(activeSection)}
+              >
+                ✕ Dismiss
+              </button>
+            </div>
+          </div>
         ) : null}
         {isSignedIn && activeSection === "syncSection" ? (
           <section id="syncSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)] dark:border-slate-800 dark:bg-slate-900">
@@ -3170,209 +3197,392 @@ export default function Home() {
         ) : null}
 
         {isSignedIn && activeSection === "projectSection" ? (
-        <section id="projectSection" className="rounded-3xl border border-[var(--line)] bg-white/90 p-6 shadow-[var(--card-shadow)]">
-          <div>
-            <h2 className="text-lg font-semibold">Project & Orgs</h2>
-            <p className="text-sm text-[var(--muted)]">Create a project, add orgs, and bind source/destination.</p>
-          </div>
-          {renderGuide("projectSection")}
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
-            <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-white p-4">
-              <h3 className="text-sm font-semibold">Project</h3>
-              <input id="projectName" className="w-full rounded-xl border border-[var(--line)] px-3 py-2" placeholder="Project name" />
-              <button className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white" onClick={handleCreateProject}>
-                Create project
-              </button>
-              <select
-                className="w-full rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
-                value={state.activeProject?.id || ""}
-                onChange={(event) => {
-                  const project = state.projects.find((item) => item.id === event.target.value) || null;
-                  setState((prev) => ({ ...prev, activeProject: project }));
-                }}
+        <section id="projectSection" className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl backdrop-blur-md">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-800">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>🏢</span> Workspace &amp; Salesforce Environments
+              </h2>
+              <p className="text-xs text-slate-400">Manage project workspaces, bind source and target Salesforce orgs, and configure OAuth credentials.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setWorkspaceTab("projects")}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                  workspaceTab === "projects"
+                    ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                    : "border border-slate-800 bg-slate-800/60 text-slate-400 hover:text-white"
+                }`}
               >
-                {projectOptions.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-white p-4">
-              <h3 className="text-sm font-semibold">Add Org</h3>
-              <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
-                Run: <span className="font-mono">sf org display --target-org dev --verbose --json</span>
-              </div>
-              <input id="orgAlias" className="w-full rounded-xl border border-[var(--line)] px-3 py-2" placeholder="Org alias" />
-              <textarea id="orgAuthUrl" className="h-24 w-full rounded-xl border border-[var(--line)] px-3 py-2" placeholder="sfdxAuthUrl"></textarea>
-              <button className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white" onClick={handleAddOrg}>
-                Save org
+                Projects ({state.projects.length})
               </button>
-            </div>
-
-            <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-white p-4">
-              <h3 className="text-sm font-semibold">Bind Orgs</h3>
-              <select id="sourceOrgSelect" className="w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                <option value="">Source org</option>
-                {state.orgs.map((org, idx) => (
-                  <option key={`${org.alias}-${idx}`} value={org.alias}>
-                    {org.alias}
-                  </option>
-                ))}
-              </select>
-              <select id="destOrgSelect" className="w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                <option value="">Destination org</option>
-                {state.orgs.map((org, idx) => (
-                  <option key={`${org.alias}-${idx}`} value={org.alias}>
-                    {org.alias}
-                  </option>
-                ))}
-              </select>
-              <button className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white" onClick={handleAttachOrgs}>
-                Attach orgs
+              <button
+                onClick={() => setWorkspaceTab("orgs")}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                  workspaceTab === "orgs"
+                    ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                    : "border border-slate-800 bg-slate-800/60 text-slate-400 hover:text-white"
+                }`}
+              >
+                Authorized Orgs ({state.orgs.length})
               </button>
             </div>
           </div>
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl border border-[var(--line)] bg-white p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold">Projects overview</h3>
-                <span className="text-xs text-[var(--muted)]">{state.projects.length} total</span>
-              </div>
-              <div className="mt-3 overflow-auto">
-                {state.projects.length ? (
-                  <table className="min-w-full text-xs">
-                    <thead className="text-left text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
-                      <tr>
-                        <th className="px-2 py-1">Name</th>
-                        <th className="px-2 py-1">Source</th>
-                        <th className="px-2 py-1">Destination</th>
-                        <th className="px-2 py-1">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {state.projects.map((project) => (
-                        <tr key={project.id} className="border-t">
-                          <td className="px-2 py-2">
-                            <input
-                              className="w-full rounded-lg border border-[var(--line)] px-2 py-1 text-xs"
-                              value={projectEdits[project.id] ?? project.name}
-                              onChange={(event) =>
-                                setProjectEdits((prev) => ({ ...prev, [project.id]: event.target.value }))
-                              }
-                            />
-                          </td>
-                          <td className="px-2 py-2">{project.sourceOrg || "unset"}</td>
-                          <td className="px-2 py-2">{project.destinationOrg || "unset"}</td>
-                          <td className="px-2 py-2">
-                            <button
-                              className="rounded-full border border-[var(--line)] px-2 py-1 text-[10px]"
-                              onClick={() => setState((prev) => ({ ...prev, activeProject: project }))}
-                            >
-                              Select
-                            </button>
-                            <button
-                              className="ml-2 rounded-full border border-[var(--line)] px-2 py-1 text-[10px]"
-                              onClick={() => handleUpdateProject(project.id)}
-                            >
-                              Save
-                            </button>
-                            <button
-                              className="ml-2 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] text-rose-700"
-                              onClick={() =>
-                                confirmActionWith(`Delete project "${project.name}"?`, () => handleDeleteProject(project.id))
-                              }
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="text-xs text-[var(--muted)]">No projects yet.</div>
-                )}
-              </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-12">
+            {/* Left Master Column: 5 cols */}
+            <div className="lg:col-span-5 flex flex-col gap-4">
+              {workspaceTab === "projects" ? (
+                <>
+                  {/* Create New Project */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-inner">
+                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">+ Create New Project</h3>
+                    <div className="flex gap-2">
+                      <input
+                        id="projectName"
+                        className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                        placeholder="Project name (e.g. MBFS-Sprint-3)"
+                      />
+                      <button
+                        className="rounded-xl bg-sky-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-sky-600/20 hover:bg-sky-500 transition shrink-0"
+                        onClick={handleCreateProject}
+                      >
+                        Create
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Project Cards List */}
+                  <div className="flex flex-col gap-2.5 max-h-[500px] overflow-y-auto pr-1">
+                    {state.projects.length ? (
+                      state.projects.map((project) => {
+                        const isSelected = state.activeProject?.id === project.id;
+                        return (
+                          <div
+                            key={project.id}
+                            className={`rounded-2xl border p-3.5 transition flex flex-col gap-2.5 ${
+                              isSelected
+                                ? "border-sky-500/60 bg-sky-950/30 shadow-lg shadow-sky-500/10 ring-1 ring-sky-500/30"
+                                : "border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/80"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`h-2.5 w-2.5 rounded-full ${isSelected ? "bg-emerald-400" : "bg-slate-500"}`} />
+                                <span className="text-xs font-bold text-white">{project.name}</span>
+                              </div>
+                              {isSelected ? (
+                                <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[9px] font-bold text-sky-300">
+                                  ACTIVE
+                                </span>
+                              ) : (
+                                <button
+                                  className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-300 hover:bg-slate-700"
+                                  onClick={() => setState((prev) => ({ ...prev, activeProject: project }))}
+                                >
+                                  Select
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 font-mono text-[10px] text-slate-400">
+                              <span className="text-violet-400">{project.sourceOrg || "Unset"}</span>
+                              <span>➔</span>
+                              <span className="text-emerald-400">{project.destinationOrg || "Unset"}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                              <input
+                                className="w-36 rounded-lg border border-slate-700 bg-slate-950 px-2 py-0.5 text-[11px] text-white"
+                                value={projectEdits[project.id] ?? project.name}
+                                onChange={(event) =>
+                                  setProjectEdits((prev) => ({ ...prev, [project.id]: event.target.value }))
+                                }
+                              />
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300 hover:text-white"
+                                  onClick={() => handleUpdateProject(project.id)}
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  className="rounded-lg border border-rose-900/50 bg-rose-950/40 px-2 py-0.5 text-[10px] text-rose-300 hover:bg-rose-900"
+                                  onClick={() =>
+                                    confirmActionWith(`Delete project "${project.name}"?`, () => handleDeleteProject(project.id))
+                                  }
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-xs text-slate-500 p-4 text-center">No projects created yet.</div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Add Org Form */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-inner space-y-2.5">
+                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">+ Authorize New Org</h3>
+                    <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-2.5 text-[11px] text-amber-300">
+                      Run: <span className="font-mono text-amber-200">sf org display --target-org alias --verbose --json</span>
+                    </div>
+                    <input
+                      id="orgAlias"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                      placeholder="Org alias (e.g. QA, UAT, PROD)"
+                    />
+                    <textarea
+                      id="orgAuthUrl"
+                      className="h-20 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                      placeholder="sfdxAuthUrl (force://PlatformCLI:...)"
+                    />
+                    <button
+                      className="w-full rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-500 transition"
+                      onClick={handleAddOrg}
+                    >
+                      Authorize &amp; Save Org
+                    </button>
+                  </div>
+
+                  {/* Orgs List */}
+                  <div className="flex flex-col gap-2 max-h-[450px] overflow-y-auto pr-1">
+                    {state.orgs.map((org) => {
+                      const isSelected = selectedOrgAlias === org.alias;
+                      return (
+                        <div
+                          key={org.alias}
+                          onClick={() => handleSelectOrg(org.alias)}
+                          className={`cursor-pointer rounded-2xl border p-3 transition flex items-center justify-between ${
+                            isSelected
+                              ? "border-emerald-500/60 bg-emerald-950/30 shadow-md ring-1 ring-emerald-500/30"
+                              : "border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/80"
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                              <span className="text-xs font-bold text-white font-mono">{org.alias}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate max-w-[200px] mt-0.5">
+                              {(org as any).instanceUrl || "Authorized Sandbox/Prod"}
+                            </div>
+                          </div>
+                          <button
+                            className="text-xs text-slate-500 hover:text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectOrg(org.alias);
+                            }}
+                          >
+                            Inspect ➔
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="rounded-2xl border border-[var(--line)] bg-white p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold">Org details</h3>
-                <span className="text-xs text-[var(--muted)]">{state.orgs.length} orgs</span>
-              </div>
-              <div className="mt-3 grid gap-3">
-                <select
-                  className="w-full rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
-                  value={selectedOrgAlias}
-                  onChange={(event) => handleSelectOrg(event.target.value)}
-                >
-                  <option value="">Select org</option>
-                  {state.orgs.map((org, idx) => (
-                    <option key={`${org.alias}-${idx}`} value={org.alias}>
-                      {org.alias}
-                    </option>
-                  ))}
-                </select>
-                {orgDetails ? (
-                  <div className="rounded-xl border border-[var(--line)] bg-slate-50 p-3 text-xs text-[var(--muted)]">
-                    <div>Alias: {orgDetails.alias}</div>
-                    <div>API Version: {safeOrgField(orgDetails.info, ["apiVersion", "apiVersionNumber"])}</div>
-                    <div>Username: {safeOrgField(orgDetails.info, ["username", "userName", "connectedStatus"])}</div>
-                    <div>Org ID: {safeOrgField(orgDetails.info, ["id", "orgId", "organizationId"])}</div>
-                    <div>Instance: {safeOrgField(orgDetails.info, ["instanceUrl", "instance", "loginUrl"])}</div>
-                    <div>Sandbox: {safeOrgField(orgDetails.info, ["isSandbox", "sandbox"])}</div>
+            {/* Right Detail Column: 7 cols */}
+            <div className="lg:col-span-7 flex flex-col gap-5">
+              {workspaceTab === "projects" ? (
+                <>
+                  {/* Project Inspector & Org Binding */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Project Environment Binding</h3>
+                        <p className="text-xs text-slate-400">
+                          Bind origin and target Salesforce environments to:{" "}
+                          <span className="font-semibold text-sky-400">{state.activeProject?.name || "None Selected"}</span>
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs text-slate-300 font-mono">
+                        {state.activeProject?.id?.slice(0, 8) || "no-id"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-violet-300 flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-violet-400" /> Source Org (Origin)
+                        </label>
+                        <select
+                          id="sourceOrgSelect"
+                          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-violet-500"
+                          defaultValue={state.activeProject?.sourceOrg || ""}
+                        >
+                          <option value="">Select source org...</option>
+                          {state.orgs.map((org, idx) => (
+                            <option key={`${org.alias}-${idx}`} value={org.alias}>
+                              {org.alias} ({(org as any).instanceUrl || "Authorized"})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-emerald-400" /> Destination Org (Target)
+                        </label>
+                        <select
+                          id="destOrgSelect"
+                          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                          defaultValue={state.activeProject?.destinationOrg || ""}
+                        >
+                          <option value="">Select destination org...</option>
+                          {state.orgs.map((org, idx) => (
+                            <option key={`${org.alias}-${idx}`} value={org.alias}>
+                              {org.alias} ({(org as any).instanceUrl || "Authorized"})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between pt-4 border-t border-slate-800">
+                      <div className="text-[11px] text-slate-400">
+                        Changes will update the project workspace environment pipeline immediately.
+                      </div>
+                      <button
+                        className="rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-sky-500/20 hover:brightness-110 transition"
+                        onClick={handleAttachOrgs}
+                      >
+                        Save &amp; Attach Orgs
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-xs text-[var(--muted)]">Select an org to see details.</div>
-                )}
-                {orgDetails?.info ? (
-                  <div className="rounded-xl border border-[var(--line)] bg-white p-3 text-[10px] text-[var(--muted)]">
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Raw org info</div>
-                    <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[10px]">
-                      {JSON.stringify(orgDetails.info, null, 2)}
-                    </pre>
+
+                  {/* Project Telemetry Card */}
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Manifest Status</div>
+                      <div className="mt-1 text-base font-bold text-white">{manifestReady ? "Ready (Generated)" : "Needs Generation"}</div>
+                      <div className="mt-1 text-[11px] text-slate-400">Auto package.xml generator active</div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Differential Drift</div>
+                      <div className="mt-1 text-base font-bold text-white">{state.diffChanges.length} Changes</div>
+                      <div className="mt-1 text-[11px] text-slate-400">{selectedDiffCount} staged for deployment</div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Deploy Health</div>
+                      <div className="mt-1 text-base font-bold text-emerald-400">
+                        {deployStatus?.status === "running" ? "Active Job" : "Ready"}
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-400">Rollback snapshot protection ON</div>
+                    </div>
                   </div>
-                ) : null}
-                <div className="rounded-xl border border-[var(--line)] bg-white p-3 text-xs">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Edit org</div>
-                  <input
-                    className="mt-2 w-full rounded-lg border border-[var(--line)] px-2 py-1 text-xs"
-                    placeholder="Alias"
-                    value={orgAliasInput}
-                    onChange={(event) => setOrgAliasInput(event.target.value)}
-                  />
-                  <textarea
-                    className="mt-2 h-24 w-full rounded-lg border border-[var(--line)] px-2 py-1 text-xs"
-                    placeholder="sfdxAuthUrl (required to refresh)"
-                    value={orgAuthInput}
-                    onChange={(event) => setOrgAuthInput(event.target.value)}
-                  />
-                  <div className="mt-2 text-[10px] text-[var(--muted)]">
-                    Paste a fresh sfdxAuthUrl to refresh org details and apply alias changes.
+                </>
+              ) : (
+                <>
+                  {/* Org Detail Inspector */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Salesforce Org Telemetry</h3>
+                        <p className="text-xs text-slate-400">Real-time status and metadata connection specs.</p>
+                      </div>
+                      <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs text-emerald-300 font-mono">
+                        {selectedOrgAlias || "No Org Selected"}
+                      </span>
+                    </div>
+
+                    {orgDetails ? (
+                      <div className="grid gap-3 sm:grid-cols-2 text-xs">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Username</span>
+                          <span className="font-mono text-white text-[11px] break-all">
+                            {safeOrgField(orgDetails.info, ["username", "userName", "connectedStatus"]) || "N/A"}
+                          </span>
+                        </div>
+                        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Org ID</span>
+                          <span className="font-mono text-white text-[11px]">
+                            {safeOrgField(orgDetails.info, ["id", "orgId", "organizationId"]) || "N/A"}
+                          </span>
+                        </div>
+                        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block">API Version</span>
+                          <span className="font-mono text-sky-400 text-[11px]">
+                            v{safeOrgField(orgDetails.info, ["apiVersion", "apiVersionNumber"]) || "60.0"}
+                          </span>
+                        </div>
+                        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Instance URL</span>
+                          <span className="font-mono text-white text-[11px] truncate block">
+                            {safeOrgField(orgDetails.info, ["instanceUrl", "instance", "loginUrl"]) || "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs text-slate-400 text-center">
+                        Select an org from the list to view live telemetry and OAuth token status.
+                      </div>
+                    )}
+
+                    {/* Edit & Refresh Form */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">OAuth Token Refresh &amp; Rename</h4>
+                      <input
+                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-500"
+                        placeholder="Alias"
+                        value={orgAliasInput}
+                        onChange={(event) => setOrgAliasInput(event.target.value)}
+                      />
+                      <textarea
+                        className="h-20 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-mono text-white placeholder-slate-500"
+                        placeholder="sfdxAuthUrl (required to refresh session token)"
+                        value={orgAuthInput}
+                        onChange={(event) => setOrgAuthInput(event.target.value)}
+                      />
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
+                        <button
+                          className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:text-white"
+                          onClick={handleRevealOrgAuth}
+                        >
+                          {orgAuthVisible ? "Hide saved auth URL" : "Reveal saved auth URL"}
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="rounded-xl bg-sky-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-sky-500 transition"
+                            onClick={handleUpdateOrg}
+                          >
+                            Save &amp; Refresh
+                          </button>
+                          <button
+                            className="rounded-xl border border-rose-900/50 bg-rose-950/40 px-3.5 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-900 transition"
+                            onClick={() =>
+                              confirmActionWith(`Delete org "${selectedOrgAlias}"?`, () => handleDeleteOrg())
+                            }
+                          >
+                            Delete Org
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Collapsible Raw Org Info */}
+                    {orgDetails?.info ? (
+                      <details className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs">
+                        <summary className="cursor-pointer text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                          View Raw SFDX Org Telemetry (JSON)
+                        </summary>
+                        <pre className="mt-2 max-h-48 overflow-auto font-mono text-[10px] text-slate-300 whitespace-pre-wrap">
+                          {JSON.stringify(orgDetails.info, null, 2)}
+                        </pre>
+                      </details>
+                    ) : null}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      className="rounded-full border border-[var(--line)] px-3 py-1 text-xs"
-                      onClick={handleRevealOrgAuth}
-                    >
-                      {orgAuthVisible ? "Hide saved auth URL" : "Reveal saved auth URL"}
-                    </button>
-                    <button className="rounded-full border border-[var(--line)] px-3 py-1 text-xs" onClick={handleUpdateOrg}>
-                      Save & refresh
-                    </button>
-                    <button
-                      className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs text-rose-700"
-                      onClick={() =>
-                        confirmActionWith(`Delete org "${selectedOrgAlias}"?`, () => handleDeleteOrg())
-                      }
-                    >
-                      Delete org
-                    </button>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </div>
         </section>
@@ -4801,7 +5011,6 @@ export default function Home() {
             />
           </>
         ) : null}
-      </div>
     </div>
   );
 }
