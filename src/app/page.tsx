@@ -3,6 +3,13 @@
 import { AuthCard } from "@/components/auth-card";
 import { ServerVersionBadge } from "@/components/server-version-badge";
 import { OrchestratorFlow } from "@/components/orchestrator-flow";
+import { ModernNav, NavTab } from "@/components/modern-nav";
+import { OneClickSyncPanel } from "@/components/views/one-click-sync-panel";
+import { ParityPanel } from "@/components/views/parity-panel";
+import { GitDiffPanel } from "@/components/views/git-diff-panel";
+import { ManifestRetrievePanel } from "@/components/views/manifest-retrieve-panel";
+import { HistoryPanel } from "@/components/views/history-panel";
+import { SettingsPanel } from "@/components/views/settings-panel";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { translateError } from "@/lib/error-help";
@@ -242,6 +249,8 @@ export default function Home() {
   const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "mfa">("login");
   const [theme, setTheme] = useState<"light" | "mint" | "dark" | "sand" | "slate">("dark");
   const [viewMode, setViewMode] = useState<"simple" | "advanced">("simple");
+  const [activeTab, setActiveTab] = useState<NavTab>("sync");
+  const [isClassicView, setIsClassicView] = useState<boolean>(false);
   const [projectEdits, setProjectEdits] = useState<Record<string, string>>({});
   const [selectedOrgAlias, setSelectedOrgAlias] = useState<string>("");
   const [orgDetails, setOrgDetails] = useState<any>(null);
@@ -2067,8 +2076,176 @@ export default function Home() {
     return <AuthCard />;
   }
 
+  if (!isClassicView) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+        <ModernNav
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          activeProject={state.activeProject}
+          projects={state.projects}
+          onSelectProject={(projectId) => {
+            const project = state.projects.find((p) => p.id === projectId);
+            if (project) {
+              setState((prev) => ({ ...prev, activeProject: project }));
+            }
+          }}
+          sourceOrg={state.activeProject?.sourceOrg}
+          destOrg={state.activeProject?.destinationOrg}
+          isSyncing={currentProcess.includes("sync") || Boolean(deployJobId) || Boolean(compareJobId)}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          user={state.user}
+          onLogout={handleLogout}
+        />
+
+        <main className="mx-auto max-w-7xl px-6 py-8 flex flex-col gap-6">
+          {uiNotice ? (
+            <section
+              className={`rounded-2xl border px-4 py-3 text-sm flex items-center justify-between ${
+                uiNotice.type === "error"
+                  ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+              }`}
+            >
+              <div>{uiNotice.message}</div>
+              <button
+                className="text-xs font-semibold opacity-75 hover:opacity-100"
+                onClick={() => setUiNotice(null)}
+              >
+                ✕ Dismiss
+              </button>
+            </section>
+          ) : null}
+
+          {/* Active Tab View */}
+          {activeTab === "sync" && (
+            <OneClickSyncPanel
+              activeProject={state.activeProject}
+              orgs={state.orgs}
+              onNavigateTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === "parity" && (
+            <ParityPanel
+              activeProject={state.activeProject}
+              orgs={state.orgs}
+            />
+          )}
+
+          {activeTab === "diff" && (
+            <GitDiffPanel
+              activeProject={state.activeProject}
+              onNavigateTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === "manifest" && (
+            <ManifestRetrievePanel
+              activeProject={state.activeProject}
+              sourceManifest={sourceManifestValue}
+              destManifest={destManifestValue}
+              onSourceManifestChange={setSourceManifestValue}
+              onDestManifestChange={setDestManifestValue}
+              onGenerateManifest={handleGenerateManifest}
+              onSaveManifest={handleSaveManifest}
+              onReloadManifests={refreshManifests}
+              compareStrategy={compareStrategy}
+              onCompareStrategyChange={setCompareStrategy}
+              retrieveMode={retrieveMode}
+              onRetrieveModeChange={setRetrieveMode}
+              retrieveRunning={retrieveRunning}
+              onRetrieve={handleRetrieve}
+              onStopRetrieve={handleStopRetrieve}
+              retrieveEntries={retrieveEntries}
+            />
+          )}
+
+          {activeTab === "history" && (
+            <HistoryPanel
+              activeProject={state.activeProject}
+              onNavigateTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === "settings" && (
+            <SettingsPanel
+              activeProject={state.activeProject}
+              projects={state.projects}
+              orgs={state.orgs}
+              onSelectProject={(projectId) => {
+                const project = state.projects.find((p) => p.id === projectId);
+                if (project) {
+                  setState((prev) => ({ ...prev, activeProject: project }));
+                }
+              }}
+              onCreateProject={async (name) => {
+                const project = await api("/api/projects", { method: "POST", body: JSON.stringify({ name }) });
+                setOutput(project);
+                await loadProjects();
+              }}
+              onDeleteProject={handleDeleteProject}
+              onAttachOrgs={async (sourceOrg, destinationOrg) => {
+                if (!state.activeProject) return;
+                const project = await api(`/api/projects/${state.activeProject.id}/orgs`, {
+                  method: "POST",
+                  body: JSON.stringify({ sourceOrg, destinationOrg }),
+                });
+                setOutput(project);
+                setState((prev) => ({ ...prev, activeProject: project }));
+              }}
+              onAddOrg={async (alias, sfdxAuthUrl) => {
+                const org = await api("/api/orgs", { method: "POST", body: JSON.stringify({ alias, sfdxAuthUrl }) });
+                setOutput(org);
+                await loadOrgs();
+              }}
+              onDeleteOrg={handleDeleteOrg}
+              user={state.user}
+              theme={theme}
+              onThemeChange={handleThemeChange}
+            />
+          )}
+
+          {/* Minimal Modern Footer */}
+          <footer className="mt-12 border-t border-slate-200/80 pt-6 pb-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">SFDX DevOps Platform</span>
+              <span>· Enterprise Multi-Org Parity Engine</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsClassicView(true)}
+                className="hover:text-sky-600 dark:hover:text-sky-400 font-medium transition"
+              >
+                Switch to Classic Console
+              </button>
+              <a href="/docs" target="_blank" className="hover:text-sky-600 dark:hover:text-sky-400 transition">
+                Documentation
+              </a>
+              <a href="https://github.com/sfdcai/sfdx-toolkit" target="_blank" className="hover:text-sky-600 dark:hover:text-sky-400 transition">
+                GitHub
+              </a>
+            </div>
+          </footer>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
+      {isClassicView ? (
+        <div className="sticky top-0 z-50 flex items-center justify-between bg-sky-900 px-4 py-2 text-xs font-semibold text-white shadow-md">
+          <span>You are viewing the legacy Classic Console.</span>
+          <button
+            onClick={() => setIsClassicView(false)}
+            className="rounded-lg bg-sky-600 px-3 py-1 font-bold text-white hover:bg-sky-500 transition shadow-sm"
+          >
+            ⚡ Switch to Modern DevOps Hub
+          </button>
+        </div>
+      ) : null}
 
       {isSignedIn && viewMode === "advanced" ? (
       <aside
